@@ -22,6 +22,8 @@ namespace VRWorkspace.Media.UI
         #region Events
         public event Action OnPlayClicked;
         public event Action OnFavouriteClicked;
+        /// <summary>Fired whenever the bar becomes visible (true) or hidden (false).</summary>
+        public event Action<bool> OnVisibilityChanged;
         #endregion
 
         #region Private Fields
@@ -205,6 +207,7 @@ namespace VRWorkspace.Media.UI
             }
 
             _isVisible = visible;
+            OnVisibilityChanged?.Invoke(visible);
 
             if (_fadeCoroutine != null)
             {
@@ -253,7 +256,15 @@ namespace VRWorkspace.Media.UI
 
             if (_canvasGroup != null) _canvasGroup.alpha = 0f;
             if (_container != null) _container.SetActive(false);
-            _isVisible = false;
+            if (_isVisible)
+            {
+                _isVisible = false;
+                OnVisibilityChanged?.Invoke(false);
+            }
+            else
+            {
+                _isVisible = false;
+            }
         }
 
         /// <summary>
@@ -297,6 +308,7 @@ namespace VRWorkspace.Media.UI
             if (_container != null) _container.SetActive(true);
             _isVisible = true;
             _lastShowTime = Time.time;
+            OnVisibilityChanged?.Invoke(true);
         }
 
         /// <summary>
@@ -362,6 +374,7 @@ namespace VRWorkspace.Media.UI
 
             _isVisible = true;
             _lastShowTime = Time.time;
+            OnVisibilityChanged?.Invoke(true);
 
             if (_fadeCoroutine != null)
             {

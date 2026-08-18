@@ -50,7 +50,6 @@ namespace VRWorkspace.UI.RTT.Components
             None,
             Resolution,
             Fps,
-            Eye,
             Apps,
             MonitorType
         }
@@ -59,8 +58,6 @@ namespace VRWorkspace.UI.RTT.Components
         #region Events
         public event Action<int> OnResolutionSelected;
         public event Action<int> OnFpsSelected;
-        public event Action<bool> OnPassthroughToggled;
-        public event Action<bool> OnLightToggled;
         public event Action OnDismissed;
         public event Action<int> OnAppSlotClicked;
         public event Action<bool> OnMonitorTypeSelected;
@@ -90,15 +87,9 @@ namespace VRWorkspace.UI.RTT.Components
         // Icons
         private Dictionary<int, Sprite> _resolutionIcons = new Dictionary<int, Sprite>();
         private Dictionary<int, Sprite> _fpsIcons = new Dictionary<int, Sprite>();
-        private Sprite _iconPassthrough;
-        private Sprite _iconLightOn;
-        private Sprite _iconLightOff;
         private Sprite _iconFlatMonitor;
         private Sprite _iconCurvedMonitor;
 
-        // Eye expansion state
-        private bool _isPassthroughOn = false;
-        private bool _isLightOn = true; // Default ON
         private bool _isCurved = true; // Default for monitor type
 
         // App expansion state
@@ -223,20 +214,6 @@ namespace VRWorkspace.UI.RTT.Components
         }
 
         /// <summary>
-        /// Show expansion panel with Eye options (Passthrough and Light).
-        /// </summary>
-        /// <param name="isPassthroughOn">Current passthrough state</param>
-        /// <param name="isLightOn">Current light state</param>
-        /// <param name="triggerButtonWorldPos">World position of the trigger button (for X-axis alignment)</param>
-        public void ShowEyeOptions(bool isPassthroughOn, bool isLightOn, Vector3? triggerButtonWorldPos = null)
-        {
-            _isPassthroughOn = isPassthroughOn;
-            _isLightOn = isLightOn;
-            CalculateLocalXOffset(triggerButtonWorldPos);
-            ShowExpansion(ExpansionType.Eye);
-        }
-
-        /// <summary>
         /// Show expansion panel with Monitor Type options (Flat and Curved).
         /// </summary>
         /// <param name="isCurved">Current curvature state</param>
@@ -290,6 +267,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             _isVisible = false;
             _currentType = ExpansionType.None;
+            SetVisible(false);
 
             if (gameObject.activeInHierarchy)
             {
@@ -321,69 +299,6 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 UpdateButtonStates();
             }
-        }
-
-        /// <summary>
-        /// Set passthrough state from external (used when light toggles).
-        /// </summary>
-        public void SetPassthroughState(bool isOn)
-        {
-            if (_isPassthroughOn == isOn) return;
-
-            _isPassthroughOn = isOn;
-            if (_currentType == ExpansionType.Eye)
-            {
-                UpdateEyeButtonStates();
-                MarkDirty();
-            }
-        }
-
-        /// <summary>
-        /// Set light state from external source (e.g., Video Player).
-        /// </summary>
-        public void SetLightState(bool isOn)
-        {
-            if (_isLightOn == isOn) return;
-
-            _isLightOn = isOn;
-            if (_currentType == ExpansionType.Eye)
-            {
-                UpdateEyeButtonStates();
-                SetPassthroughInteractable(isOn);
-                MarkDirty();
-            }
-        }
-
-        /// <summary>
-        /// Set whether passthrough button is interactable (disabled when light is OFF).
-        /// </summary>
-        public void SetPassthroughInteractable(bool interactable)
-        {
-            if (_currentType != ExpansionType.Eye || _optionButtons.Count < 1) return;
-
-            var passthroughBtn = _optionButtons[0];
-            var button = passthroughBtn.GetComponentInChildren<UnityEngine.UI.Button>();
-            if (button != null)
-            {
-                button.interactable = interactable;
-            }
-
-            // Disable hover effect when locked
-            var hoverController = passthroughBtn.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
-            if (hoverController != null)
-            {
-                hoverController.enabled = interactable;
-            }
-
-            // Dim the icon when disabled
-            var canvasGroup = passthroughBtn.GetComponent<CanvasGroup>();
-            if (canvasGroup == null)
-            {
-                canvasGroup = passthroughBtn.AddComponent<CanvasGroup>();
-            }
-            canvasGroup.alpha = interactable ? 1f : 0.5f;
-
-            MarkDirty();
         }
 
         /// <summary>
@@ -572,6 +487,7 @@ namespace VRWorkspace.UI.RTT.Components
             // Show
             gameObject.SetActive(true);
             _isVisible = true;
+            SetVisible(true);
 
             // NOTE: Not setting CurrentlyOpenExpansion - click-outside-to-close is disabled for all expansion types
 
@@ -627,7 +543,6 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 ExpansionType.Resolution => _resolutionOptions.Length,
                 ExpansionType.Fps => _fpsOptions.Length,
-                ExpansionType.Eye => 2, // Passthrough + Light
                 ExpansionType.Apps => appExpansionCapacity, // Fixed 4 slots
                 ExpansionType.MonitorType => 2, // Flat + Curved
                 _ => 3
@@ -711,10 +626,6 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 CreateFpsButtons();
             }
-            else if (_currentType == ExpansionType.Eye)
-            {
-                CreateEyeButtons();
-            }
             else if (_currentType == ExpansionType.Apps)
             {
                 CreateAppButtons();
@@ -765,32 +676,6 @@ namespace VRWorkspace.UI.RTT.Components
                 SetLayerRecursively(btn, LayerMask.NameToLayer("UI"));
                 _optionButtons.Add(btn);
             }
-        }
-
-        private void CreateEyeButtons()
-        {
-            // Passthrough button
-            Color passthroughColor = _isPassthroughOn ? _purpleColor : _cyanColor;
-            var passthroughBtn = VRButtonFactory.CreateBareIconButton(
-                _contentContainer, buttonSize, _iconPassthrough, passthroughColor,
-                OnPassthroughButtonClicked,
-                0.05f, 0.6f
-            );
-            passthroughBtn.name = "Btn_Passthrough";
-            SetLayerRecursively(passthroughBtn, LayerMask.NameToLayer("UI"));
-            _optionButtons.Add(passthroughBtn);
-
-            // Light button
-            Color lightColor = _isLightOn ? _purpleColor : _cyanColor;
-            Sprite lightIcon = _isLightOn ? _iconLightOn : _iconLightOff;
-            var lightBtn = VRButtonFactory.CreateBareIconButton(
-                _contentContainer, buttonSize, lightIcon, lightColor,
-                OnLightButtonClicked,
-                0.05f, 0.6f
-            );
-            lightBtn.name = "Btn_Light";
-            SetLayerRecursively(lightBtn, LayerMask.NameToLayer("UI"));
-            _optionButtons.Add(lightBtn);
         }
 
         private void CreateAppButtons()
@@ -905,45 +790,6 @@ namespace VRWorkspace.UI.RTT.Components
                     hoverController.SetForceHover(isActive);
                 }
             }
-        }
-
-        private void OnPassthroughButtonClicked()
-        {
-            _isPassthroughOn = !_isPassthroughOn;
-            UpdateEyeButtonStates();
-            OnPassthroughToggled?.Invoke(_isPassthroughOn);
-            MarkDirty();
-
-            // Hide after selection (except Apps expansion)
-            Hide();
-        }
-
-        private void OnLightButtonClicked()
-        {
-            _isLightOn = !_isLightOn;
-            UpdateEyeButtonStates();
-            OnLightToggled?.Invoke(_isLightOn);
-            MarkDirty();
-
-            // Hide after selection (except Apps expansion)
-            Hide();
-        }
-
-        private void UpdateEyeButtonStates()
-        {
-            if (_optionButtons.Count < 2) return;
-
-            // Passthrough button (index 0)
-            Color passthroughColor = _isPassthroughOn ? _purpleColor : _cyanColor;
-            VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[0], passthroughColor);
-
-            // Light button (index 1) - also update icon
-            Color lightColor = _isLightOn ? _purpleColor : _cyanColor;
-            VRButtonFactory.SetBareIconButtonGlowColor(_optionButtons[1], lightColor);
-
-            // Update light icon
-            Sprite lightIcon = _isLightOn ? _iconLightOn : _iconLightOff;
-            VRButtonFactory.SetBareIconButtonSprite(_optionButtons[1], lightIcon);
         }
 
         private void OnResolutionButtonClicked(int resH)
@@ -1238,18 +1084,12 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
-            // Eye expansion icons
-            _iconPassthrough = Resources.Load<Sprite>("icon_passthrough");
-            _iconLightOn = Resources.Load<Sprite>("icon_light_on");
-            _iconLightOff = Resources.Load<Sprite>("icon_light_off");
-
             // Monitor type icons
             _iconFlatMonitor = Resources.Load<Sprite>("icon_flat_monitor");
             _iconCurvedMonitor = Resources.Load<Sprite>("icon_curved_monitor");
 
             Debug.Log($"[RTTTaskbarExpansion] Icons loaded - Resolution: {_resolutionIcons.Count}/{_resolutionOptions.Length}, " +
                 $"FPS: {_fpsIcons.Count}/{_fpsOptions.Length}, " +
-                $"Passthrough: {_iconPassthrough != null}, LightOn: {_iconLightOn != null}, LightOff: {_iconLightOff != null}, " +
                 $"FlatMonitor: {_iconFlatMonitor != null}, CurvedMonitor: {_iconCurvedMonitor != null}");
         }
         #endregion

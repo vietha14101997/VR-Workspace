@@ -61,6 +61,7 @@ namespace VRWorkspace.UI.RTT
         protected int _framesSinceLastRender = 0;
         protected float _lastDirtyTime;
         protected bool _continuousRender = false; // For animated content that needs constant updates
+        private const int MinimumPeriodicRefreshFrames = 7;
 
         // State tracking
         protected bool _isInitialized = false;
@@ -79,6 +80,16 @@ namespace VRWorkspace.UI.RTT
 
         /// <summary>Invoked when visibility changes (bool = isVisible)</summary>
         public event Action<bool> OnVisibilityChanged;
+
+        // ----- Static broadcasts (Phase 5: VCS auto-register hooks) -----
+        /// <summary>Static: fired after OnRTTCreated on any instance. Used by VCS auto-registrar.</summary>
+        public static event Action<RTTCanvasBase> OnAnyRTTSurfaceCreated;
+
+        /// <summary>Static: fired after OnRTTDestroyed on any instance. Used by VCS auto-registrar.</summary>
+        public static event Action<RTTCanvasBase> OnAnyRTTSurfaceDestroyed;
+
+        /// <summary>Static: fired after OnVisibilityChanged on any instance (slightly redundant — re-passed).</summary>
+        public static event Action<RTTCanvasBase, bool> OnAnyRTTVisibilityChanged;
         #endregion
 
         #region Properties
@@ -202,6 +213,8 @@ namespace VRWorkspace.UI.RTT
                 RTTManager.Instance?.RegisterPanel(this);
 
                 OnRTTCreated?.Invoke();
+                OnAnyRTTSurfaceCreated?.Invoke(this);
+                OnAnyRTTVisibilityChanged?.Invoke(this, _isVisible);
 
                 if (config != null && config.logPerformanceMetrics)
                 {
@@ -628,8 +641,11 @@ namespace VRWorkspace.UI.RTT
 
             // Check if we should render
             // Continuous render mode always renders (for animated content)
+            int periodicRefreshFrames = config.maxFrameSkip > 0
+                ? Mathf.Max(config.maxFrameSkip, MinimumPeriodicRefreshFrames)
+                : 0;
             bool shouldRender = _isDirty || _continuousRender ||
-                (config.maxFrameSkip > 0 && _framesSinceLastRender >= config.maxFrameSkip);
+                (periodicRefreshFrames > 0 && _framesSinceLastRender >= periodicRefreshFrames);
 
             if (shouldRender)
             {
@@ -695,6 +711,9 @@ namespace VRWorkspace.UI.RTT
             if (wasVisible != visible)
                 OnVisibilityChanged?.Invoke(visible);
 
+            if (wasVisible != visible)
+                OnAnyRTTVisibilityChanged?.Invoke(this, visible);
+
             if (visible)
                 MarkDirty();
         }
@@ -724,6 +743,7 @@ namespace VRWorkspace.UI.RTT
         protected virtual void Cleanup()
         {
             OnRTTDestroyed?.Invoke();
+            OnAnyRTTSurfaceDestroyed?.Invoke(this);
 
             // Unregister from manager
             RTTManager.Instance?.UnregisterPanel(this);

@@ -93,6 +93,23 @@ namespace VRWorkspace.UI.RTT.Components
         public string InputValue => _inputField != null ? _inputField.text : "";
 
         /// <summary>
+        /// Check if a GameObject is part of this popup panel (used by VCS click dispatch).
+        /// </summary>
+        public bool IsPartOfPopupPanel(GameObject obj)
+        {
+            if (obj == null) return false;
+            if (_popupObject == null) return false;
+            Transform current = obj.transform;
+            while (current != null)
+            {
+                if (current.gameObject == _popupObject || current.gameObject == gameObject)
+                    return true;
+                current = current.parent;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Set the default value for the input field (will be shown when popup opens)
         /// </summary>
         public void SetDefaultValue(string value)

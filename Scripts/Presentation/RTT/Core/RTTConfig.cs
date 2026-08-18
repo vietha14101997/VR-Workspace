@@ -58,9 +58,9 @@ namespace VRWorkspace.UI.RTT
         [Tooltip("Only re-render when UI changes (dirty flag optimization)")]
         public bool useDirtyFlag = true;
 
-        [Tooltip("Maximum frames to skip between renders (0 = always render)")]
-        [Range(0, 10)]
-        public int maxFrameSkip = 2;
+        [Tooltip("Periodic safety refresh interval in frames (0 = render only when dirty). Values 1-6 are clamped to 7 at runtime to protect mobile thermals.")]
+        [Range(0, 30)]
+        public int maxFrameSkip = 7;
 
         [Tooltip("Delay before applying dirty flag (for animations)")]
         [Range(0f, 1f)]

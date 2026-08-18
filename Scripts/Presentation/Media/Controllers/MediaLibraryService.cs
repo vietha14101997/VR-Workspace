@@ -32,6 +32,17 @@ namespace VRWorkspace.Media.Core
                 return _instance;
             }
         }
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, _instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
         #endregion
 
         #region Constants
@@ -398,7 +409,15 @@ namespace VRWorkspace.Media.Core
         #region Private: Metadata Preload
         private void PreloadMetadata()
         {
-            var allPaths = AllVideos.Select(v => v.Path).ToList();
+            var allPaths = AllVideos
+                .Select(item => item.Path)
+                .Where(path =>
+                {
+                    string extension = System.IO.Path.GetExtension(path)?.ToLowerInvariant();
+                    return MediaLibraryScanner.IsVideoExtension(extension) ||
+                           MediaLibraryScanner.IsAudioExtension(extension);
+                })
+                .ToList();
             if (allPaths.Count > 0)
             {
                 Debug.Log($"[MediaLibraryService] Triggering metadata preload for {allPaths.Count} files");

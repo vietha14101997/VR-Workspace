@@ -1,4 +1,9 @@
 *.meta
+!Scripts/Core/Platform/VrQuality.cs.meta
+!Scripts/Domain/Input/Tracking.meta
+!Scripts/Domain/Input/Tracking/*.meta
+!Scripts/Presentation/Input/CardboardTrackingController.cs.meta
+!Tests/EditMode/Input/YawCorrectionFilterTests.cs.meta
 *.unity
 *.prefab
 Scenes/MainScene.unity

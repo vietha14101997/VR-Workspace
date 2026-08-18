@@ -1,5 +1,6 @@
 using System;
-using System.Collections;
+using Concentus;
+using Concentus.Enums;
 using UnityEngine;
 using VRWorkspace.Native;
 using VRWorkspace.Core;
@@ -7,28 +8,31 @@ using VRWorkspace.Core;
 namespace VRWorkspace.Streaming
 {
     /// <summary>
-    /// H265 custom decode pipeline coordinator.
+    /// H265/H264 stream receiver — Plan C direct-surface mode.
     ///
-    /// Bridges unity-webrtc encoded H265 frames → HevcDecoderPlugin (MediaCodec NDK) → Unity RenderTexture.
+    /// <para>This is the simplest possible pipeline:
+    /// <list type="bullet">
+    ///   <item>One Unity Texture2D whose GL handle MediaCodec writes to.</item>
+    ///   <item>No Texture2D.Apply async upload, no Blit, no Compute dispatch,
+    ///         no mipmap chain. MediaCodec's GPU color converter renders directly
+    ///         into the texture we sample. Producer and consumer share the
+    ///         same memory region.</item>
+    ///   <item>Java's <see cref="SurfaceBinder"/> holds the SurfaceTexture and
+    ///         Surface as JVM-static fields so Java GC cannot release them
+    ///         (which was the cause of the previous Surface-mode crash on
+    ///         vivo V2352GA / Android 16).</item>
+    /// </list></para>
     ///
-    /// Architecture:
-    ///   WebRTC RTCRtpReceiver.Transform
-    ///     └─► OnEncodedFrameReceived()
-    ///              └─► HevcDecoderPlugin.DecodeNal()
-    ///                       └─► Update() polls decoded frames
-    ///                                └─► Blit NV12→RGBA via shader
-    ///                                         └─► OnTextureReady event
-    ///
-    /// Usage:
-    ///   var receiver = new H265StreamReceiver(monitorIdx, width, height);
-    ///   receiver.OnTextureReady += (idx, tex) => { ... };
-    ///   receiver.Start();
-    ///   // From WebRTC encoded frame callback:
-    ///   receiver.OnEncodedFrameReceived(encodedData, isKeyFrame, timestampUs);
-    ///   // Each Unity Update():
-    ///   receiver.Tick();
-    ///   // On disconnect:
-    ///   receiver.Dispose();
+    /// <para>Per-frame flow on Unity main thread:
+    /// <code>
+    ///   WebRTC RTCRtpReceiver
+    ///     └─► OnEncodedFrameReceived()              (background thread)
+    ///              └─► HevcDecoderPlugin.PushEncodedFrame()
+    ///                       └─► Tick() polls decoded frames
+    ///                                └─► decoder.TickFrame()
+    ///                                          └─► SurfaceTexture.updateTexImage() (Java)
+    ///                                                  └─► OnTextureReady(sharedTexture)
+    /// </code></para>
     /// </summary>
     public class H265StreamReceiver : IDisposable
     {
@@ -44,79 +48,64 @@ namespace VRWorkspace.Streaming
         private HevcDecoderPlugin _decoder;
         private bool _initialized;
         private bool _disposed;
-        private bool _flipY = true;      // true fixes upside-down reports
-        private bool _fullRange = false;  // Hardware MediaCodec outputs limited-range YUV (Y:16-235)
+        private bool _flipY = true;
 
-        // Thread-safe timing
         private static readonly System.Diagnostics.Stopwatch _stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        // ──────────── Textures ────────────
-        private Texture2D _yTex;
-        private Texture2D _uvTex;
-        private RenderTexture _outputRt;
-        private Material _nv12Material;
+        // ── Shared texture exposed by the decoder (Plan C) ──
+        // The decoder allocates the GL_TEXTURE_EXTERNAL_OES handle on the
+        // Java side, wraps it via Texture2D.CreateExternalTexture, and
+        // returns it as SharedSurfaceTexture. We hand this directly to the
+        // panel material — no intermediate RenderTexture / Blit needed.
+        private Texture2D _sharedTexture => _decoder != null ? _decoder.SharedSurfaceTexture : null;
 
-        // ──────────── Stats ────────────
+        // Stats
         public long EncodedFramesReceived { get; private set; }
         public long DecodedFrameCount     => _decodedCount;
         private long _decodedCount;
 
-        /// <summary>
-        /// When true, server reports desktop content is unchanged (user reading, no mouse movement).
-        /// Stall detection and decode polling are suppressed to save GPU/CPU and reduce thermal load.
-        /// The last decoded frame remains displayed on the output RenderTexture.
-        /// </summary>
         public volatile bool IsDesktopIdle;
 
-        /// <summary>Fired once when the first frame is successfully decoded for this monitor.</summary>
-        public event Action<int> OnFirstFrameDecoded;
-
-        // Desktop idle detection: track if server stopped sending new encoded frames
+        // Stall detector state — used to nudge the host for a keyframe.
+        private int _noFrameTicks;
+        private bool _keyframeRequested;
         private long _lastEncodedCountForStall;
 
-        /// <summary>
-        /// Fires when a short stall is detected — request keyframe before full fallback.
-        /// Parameters: monitorIndex
-        /// </summary>
-        public event Action<int> OnKeyframeNeeded;
-        private bool _keyframeRequested; // Prevent spamming keyframe requests
+        private const int KEYFRAME_NUDGE_THRESHOLD = 45;   // ~0.75s @ 60Hz
+        private const int KEYFRAME_STALL_THRESHOLD  = 90;   // ~1.5s
 
-        // Y/UV byte buffers — reused to avoid GC pressure
-        private byte[] _yBuf;
-        private byte[] _uvBuf;
-
-        // ──────────── Corruption Detection ────────────
-        // Track Y-plane luminance to detect inter-frame prediction corruption.
-        // When P-frames are lost, decoder produces frames with wildly wrong colors.
-        // Detect by monitoring average luminance jumps between consecutive frames.
-        private float _prevAvgLuminance = -1f;
-        private int _luminanceJumpCount = 0;
-        private const float LUMINANCE_JUMP_THRESHOLD = 0.25f;  // 25% absolute jump in avg Y
-        private const int LUMINANCE_JUMP_TRIGGER = 3;           // 3 rapid jumps = likely corruption
-        private DateTime _lastLuminanceJumpTime = DateTime.MinValue;
-        private const float LUMINANCE_JUMP_WINDOW_SECONDS = 1.0f; // Reset jump count after 1s calm
-
-        // Corruption recovery state
-        private bool _corruptionSuspected;
-        private DateTime _lastCorruptionTime = DateTime.MinValue;
-
-        // ── IDR gate: after flush, only accept keyframes until reference chain is restored ──
-        private bool _waitingForCleanIdr;
-
-        /// <summary>
-        /// Fires when frame corruption is detected (e.g., from inter-frame prediction errors).
-        /// Parameters: monitorIndex. Receiver should request keyframe + decoder flush.
-        /// </summary>
-        public event Action<int> OnCorruptionDetected;
+        // ── IDR-age watchdog ──
+        // Bug: tab-switch on the host produces P-frame-only updates for up to GOP seconds.
+        // P-frames reference the OLD keyframe (e.g. Messenger), so the client decoder
+        // reconstructs "Messenger layout + YouTube video area" until the next IDR arrives.
+        //
+        // PRIMARY FIX is now on the host: when client sends input (Tab / click / Ctrl-key),
+        // the host proactively forces an IDR within ~1 frame. So this watchdog is only a
+        // safety net for cases where the host missed an input (DC packet loss, reconnect
+        // after desync, etc.) — it's intentionally relaxed so it doesn't spam the host
+        // with `request_keyframe` when input-driven IDRs are already arriving on time.
+        //
+        // BUGFIX: 2500ms was too aggressive for IDLE desktop scenarios. With AMF HEVC's
+        // GOP_SIZE configured in FRAMES (not seconds), an idle track encoding at 2 fps
+        // gets an IDR only every ~5 seconds (60 frames at 2fps). The watchdog at 2.5s
+        // would fire BETWEEN actual IDRs → false alarm → request_keyframe storm.
+        // Bumped to 5000ms so idle tracks don't trigger spurious requests.
+        private long _lastIdrReceiveMs;
+        private long _lastIdrRequestMs;
+        private const int IDR_STALE_AGE_MS       = 5000;  // request IDR if none in 5s (was 2.5s)
+        private const int IDR_REQUEST_COOLDOWN_MS = 3000;  // throttle to <= 1/3s (was 2s)
 
         // ──────────── Events ────────────
-        /// <summary>
-        /// Fires on Unity main thread each time a new decoded frame is ready.
-        /// Parameters: monitorIndex, texture (RGBA RenderTexture)
-        /// </summary>
+        public event Action<int> OnFirstFrameDecoded;
+        public event Action<int> OnKeyframeNeeded;
+        /// <summary>No-op in surface mode; kept for API compat.</summary>
+#pragma warning disable CS0067
+        public event Action<int> OnCorruptionDetected;
+#pragma warning restore CS0067
+        /// <summary>Fires on Unity main thread each time a frame is drained.
+        /// The Texture argument is the same instance across frames; bind it
+        /// to the panel material directly.</summary>
         public event Action<int, Texture> OnTextureReady;
-
-        // ──────────── Constructor ────────────
 
         public H265StreamReceiver(int monitorIndex, int width, int height, bool isH264 = false)
         {
@@ -128,439 +117,146 @@ namespace VRWorkspace.Streaming
 
         // ──────────── Lifecycle ────────────
 
-        /// <summary>
-        /// Initialize decoder and textures. Must be called on Unity main thread.
-        /// </summary>
         public bool Start()
         {
             if (_disposed) throw new ObjectDisposedException(nameof(H265StreamReceiver));
-
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!HevcDecoderPlugin.IsAvailable())
             {
-                Debug.LogError($"{TAG} PC{MonitorIndex} HEVC hardware decoder not available on this device");
+                Debug.LogError($"{TAG} PC{MonitorIndex} HEVC hardware decoder not available");
                 return false;
             }
 #endif
+            // The decoder allocates its own GL_TEXTURE_EXTERNAL_OES handle on
+            // the Java side (Android SurfaceTexture requires OES-target texture
+            // objects; a Unity Texture2D handle is GL_TEXTURE_2D and silently
+            // fails to bind as OES on Adreno GPUs). The decoder wraps the OES
+            // handle via Texture2D.CreateExternalTexture so the panel can
+            // sample it with sampler2D — the same GPU memory MediaCodec writes.
             _decoder = new HevcDecoderPlugin();
-            bool ok = _decoder.Initialize(Width, Height, IsH264);
+            bool ok = _decoder.StartDirectSurface(Width, Height, IsH264);
             if (!ok)
             {
-                Debug.LogError($"{TAG} PC{MonitorIndex} Failed to initialize {(IsH264 ? "H264" : "HEVC")} DecoderPlugin {Width}x{Height}");
+                Debug.LogError($"{TAG} PC{MonitorIndex} Decoder (surface mode) init failed {Width}x{Height}");
                 _decoder.Dispose();
                 _decoder = null;
                 return false;
             }
-
-            // Y plane: R8 texture (full resolution)
-            _yTex = new Texture2D(Width, Height, TextureFormat.R8, false, true);
-            _yTex.filterMode = FilterMode.Bilinear;
-            _yTex.name = $"H265_Y_Mon{MonitorIndex}";
-
-            // UV plane: RG16 texture (half resolution, interleaved)
-            _uvTex = new Texture2D(Width / 2, Height / 2, TextureFormat.RG16, false, true);
-            _uvTex.filterMode = FilterMode.Bilinear;
-            _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
-
-            // Output RenderTexture (full RGBA) with mipmaps for anti-shimmer in VR.
-            // Without mipmaps, Trilinear filtering and anisoLevel are ineffective,
-            // causing shimmer artifacts especially at 1080p where source pixel density
-            // exceeds the VR display's effective pixel density on the quad.
-            _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
-            _outputRt.useMipMap = true;
-            _outputRt.autoGenerateMips = false; // Use SharpMipGenerator (Lanczos) instead of box filter
-            _outputRt.filterMode = FilterMode.Trilinear;
-            _outputRt.anisoLevel = 8;
-            _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
-            _outputRt.Create();
-
-            // NV12→RGBA blit material
-            var shader = Shader.Find("VRWorkspace/NV12ToRGBA");
-            if (shader == null)
-            {
-                Debug.LogError($"{TAG} Shader 'VRWorkspace/NV12ToRGBA' not found! Make sure it is in the Shaders folder.");
-                return false;
-            }
-            _nv12Material = new Material(shader) { name = "NV12ToRGBA_Mat" };
-            _nv12Material.SetTexture("_YTex",  _yTex);
-            _nv12Material.SetTexture("_UVTex", _uvTex);
-            _nv12Material.SetFloat("_FlipY", _flipY ? 1f : 0f);
-            _nv12Material.SetFloat("_FullRange", _fullRange ? 1f : 0f);
-
-            // Pre-allocate CPU buffers
-            _yBuf  = new byte[Width  * Height];
-            _uvBuf = new byte[(Width / 2) * (Height / 2) * 2]; // RG16 = 2 bytes/pixel
-
             _initialized = true;
-            AppLog.Log($"{TAG} PC{MonitorIndex} Initialized {Width}x{Height}");
+            int oesHandle = 0;
+            try { oesHandle = (_decoder.SharedSurfaceTexture != null) ? _decoder.SharedSurfaceTexture.GetNativeTexturePtr().ToInt32() : 0; } catch { }
+            Debug.Log($"[H265Receiver] PIPELINE=DIRECT_SURFACE_PLAN_C texId={oesHandle} {Width}x{Height} build={Application.buildGUID}");
             return true;
         }
 
         // ──────────── Encoded Frame Input ────────────
 
-        /// <summary>
-        /// Feed a complete H265 encoded frame (Annex-B NAL unit or complete frame with multiple NALs).
-        /// Safe to call from any thread — data is queued for next Tick().
-        /// </summary>
         public void OnEncodedFrameReceived(byte[] encodedData, bool isKeyFrame, long presentationTimeUs = 0)
         {
             if (!_initialized || _disposed || _decoder == null) return;
             if (encodedData == null || encodedData.Length == 0) return;
-
             EncodedFramesReceived++;
 
+            const int BUFFER_FLAG_KEY_FRAME = 1;
 
-            // IDR gate: after flush, drop P-frames until a keyframe restores the reference chain
-            if (_waitingForCleanIdr)
+            int flags = 0;
+            if (isKeyFrame) flags |= BUFFER_FLAG_KEY_FRAME;
+
+            // Record IDR arrival time for the IDR-age watchdog (see _lastIdrReceiveMs).
+            // We update ONLY on the first IDR after bootstrap or after a long IDR gap —
+            // duplicate IDRs from a keyframe burst (host DC resync) shouldn't reset the
+            // watchdog clock prematurely.
+            if (isKeyFrame)
             {
-                if (isKeyFrame)
-                {
-                    _waitingForCleanIdr = false;
-                    AppLog.Log($"{TAG} PC{MonitorIndex} Clean IDR received — reference chain restored, accepting P-frames again");
-                }
-                else
-                {
-                    return; // Drop P-frame — no valid reference after flush
-                }
+                long nowMs = NowMs();
+                if (_lastIdrReceiveMs == 0 || nowMs - _lastIdrReceiveMs > 200)
+                    _lastIdrReceiveMs = nowMs;
             }
 
-            // Use PushEncodedFrame to pass the explicit isKeyFrame flag (detected by NAL parsing)
-            bool pushed = _decoder.PushEncodedFrame(encodedData, presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(), isKeyFrame);
-            
+            bool pushed = _decoder.PushEncodedFrame(encodedData,
+                presentationTimeUs > 0 ? presentationTimeUs : GetTimestampUs(),
+                isKeyFrame);
             if (isKeyFrame && EncodedFramesReceived < 20)
-            {
-                AppLog.Log($"{TAG} PC{MonitorIndex} Keyframe pushed to decoder {(pushed ? "successfully" : "FAILED")}: {encodedData.Length} bytes");
-            }
+                Debug.Log($"{TAG} PC{MonitorIndex} Keyframe pushed {(pushed ? "OK" : "FAILED")}: {encodedData.Length} bytes");
         }
 
-        // ──────────── Update (call from Unity main thread) ────────────
+        // ──────────── Tick (main thread) ────────────
 
-        private int _noFrameTicks;  // Consecutive ticks with no decoded frame (for stall diagnostics)
-
-        /// <summary>
-        /// Poll decoded frames and upload texture. Call this from MonoBehaviour.Update().
-        /// </summary>
         public void Tick()
         {
             if (!_initialized || _disposed || _decoder == null) return;
 
-            // Poll all available decoded frames (may have multiple queued)
-            bool gotFrame = false;
-            int maxFramesPerTick = 3; // Avoid spending too long in one frame
-            for (int i = 0; i < maxFramesPerTick; i++)
+            int drained = _decoder.TickFrame(0);   // non-blocking
+            // Track decoded count for stall detection / logs.
+            for (int i = 0; i < drained; i++)
             {
-                if (!_decoder.TryGetFrame()) break;
-                gotFrame = true;
                 _decodedCount++;
-
-                // Fire first-frame event (once) so UI can wait for all monitors to have content
-                if (_decodedCount == 1)
-                    OnFirstFrameDecoded?.Invoke(MonitorIndex);
-
-                // Throttled diagnostic logging to confirm frame output
+                if (_decodedCount == 1) OnFirstFrameDecoded?.Invoke(MonitorIndex);
                 if (_decodedCount % 300 == 0 || _decodedCount < 10)
-                {
-                    AppLog.Log($"{TAG} PC{MonitorIndex} Frame decoded: #{_decodedCount}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
-                }
+                    Debug.Log($"{TAG} PC{MonitorIndex} Frame drained: #{_decodedCount}");
             }
 
-            if (!gotFrame)
+            if (drained > 0)
             {
-                // When streaming is paused OR desktop is idle, no frames are expected.
-                // Reset stall counter to prevent false DECODER FAILURE.
-                if (IsDesktopIdle)
+                // Frame arrived — fire texture-ready immediately. Panel binds to
+                // the SHARED texture (single GL handle, no ping-pong needed).
+                OnTextureReady?.Invoke(MonitorIndex, _sharedTexture);
+                _noFrameTicks = 0;
+                _keyframeRequested = false;
+
+                // ── IDR-age watchdog ──
+                // If we have been receiving frames for a while but haven't seen an
+                // IDR in IDR_STALE_AGE_MS, the host's GOP-pacing or scenecut may
+                // be stuck. Force an IDR to break out of a possible "P-frame referencing
+                // stale keyframe" loop (the original tab-switch bug).
+                if (_lastIdrReceiveMs > 0 && _decodedCount > 0)
                 {
-                    _noFrameTicks = 0;
-                    _keyframeRequested = false;
-
-                    return;
-                }
-
-                _noFrameTicks++;
-
-                // Desktop idle detection: if server stopped sending frames (EncodedFramesReceived
-                // hasn't increased), the desktop is static — no stall, no keyframe request needed.
-                // The last decoded frame remains displayed correctly.
-                if (_decodedCount > 0 && EncodedFramesReceived == _lastEncodedCountForStall)
-                {
-                    // Server not sending new frames → desktop idle → suppress stall detection
-                    _noFrameTicks = 0;
-                    _keyframeRequested = false;
-                    return;
-                }
-                _lastEncodedCountForStall = EncodedFramesReceived;
-
-                // Request keyframe after ~0.75s stall (45 ticks at 60fps) — fast recovery for corruption
-                if (_noFrameTicks == 45 && !_keyframeRequested && _decodedCount > 0)
-                {
-                    _keyframeRequested = true;
-                    // Push stall reference forward: give server time to respond to keyframe request
-                    // before triggering DECODER FAILURE fallback. Server may be draining DC buffer.
-
-                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} Short stall detected ({_noFrameTicks} ticks, ~{_noFrameTicks / 60f:F1}s), requesting keyframe");
-                    OnKeyframeNeeded?.Invoke(MonitorIndex);
-                }
-
-                // Self-recovery: flush decoder + request keyframe at 1.5s (90 ticks).
-                // Android MediaCodec can hang on a single instance while others work fine.
-                // Flushing clears the stuck frame and restores the decode pipeline.
-                if (_noFrameTicks == 90 && _decodedCount > 0)
-                {
-                    Debug.LogWarning($"{TAG} PC{MonitorIndex} Decoder stall 3s — flushing decoder for self-recovery");
-                    Flush();
-                    _keyframeRequested = false; // Allow fresh keyframe request after flush
-                    OnKeyframeNeeded?.Invoke(MonitorIndex);
-                }
-
-                // Log warning every ~3s (180 ticks at 60fps)
-                if (_noFrameTicks == 180 || _noFrameTicks == 600 || _noFrameTicks == 1200)
-                {
-                    float elapsed = _noFrameTicks / 60f;
-                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} SUSTAINED STALL: No frame from decoder for {_noFrameTicks} ticks ({elapsed:F1}s). " +
-                        $"Stats: decoded={_decodedCount}, encoded={EncodedFramesReceived} (gap={EncodedFramesReceived - _decodedCount}). " +
-                        $"Plugin: initialized={_decoder.IsInitialized}, strides={_decoder.YStride}/{_decoder.UVStride}, size={_decoder.FrameWidth}x{_decoder.FrameHeight}");
+                    long nowMs = NowMs();
+                    if (nowMs - _lastIdrReceiveMs > IDR_STALE_AGE_MS &&
+                        nowMs - _lastIdrRequestMs > IDR_REQUEST_COOLDOWN_MS)
+                    {
+                        _lastIdrRequestMs = nowMs;
+                        Debug.LogWarning($"{TAG} PC{MonitorIndex} No IDR in {(nowMs - _lastIdrReceiveMs) / 1000f:F1}s — requesting keyframe (tab-switch safeguard)");
+                        OnKeyframeNeeded?.Invoke(MonitorIndex);
+                    }
                 }
 
                 return;
             }
 
-            _noFrameTicks = 0; // Reset on successful frame
-            _keyframeRequested = false; // Allow new keyframe request on next stall
-            // Get Y plane data
-            byte[] yData  = _decoder.GetYPlaneData();
-            byte[] uvData = _decoder.GetUVPlaneData();
-
-            if (yData == null || uvData == null) return;
-
-            int yStride  = _decoder.YStride;
-            int uvStride = _decoder.UVStride;
-            int fWidth   = _decoder.FrameWidth;
-            int fHeight  = _decoder.FrameHeight;
-
-            // Handle resolution changes by reallocating textures and buffers.
-            // If the decoder starts outputting a lower/higher resolution than configured
-            // (e.g. Adaptive Bitrate downscaling), we must recreate textures to prevent
-            // UnityException (LoadRawTextureData: not enough data provided).
-            if (fWidth != Width || fHeight != Height)
+            // ── Stall detection ──
+            if (IsDesktopIdle) { _noFrameTicks = 0; _keyframeRequested = false; return; }
+            _noFrameTicks++;
+            if (_decodedCount > 0 && EncodedFramesReceived == _lastEncodedCountForStall)
             {
-                AppLog.LogWarning($"{TAG} PC{MonitorIndex} Resolution changed dynamically: {Width}x{Height} -> {fWidth}x{fHeight}. Reallocating textures.");
-                
-                Width = fWidth;
-                Height = fHeight;
-                
-                if (_yTex != null) { UnityEngine.Object.Destroy(_yTex); }
-                if (_uvTex != null) { UnityEngine.Object.Destroy(_uvTex); }
-                if (_outputRt != null) { _outputRt.Release(); UnityEngine.Object.Destroy(_outputRt); }
-                
-                // Recreate textures with the new dimensions
-                _yTex = new Texture2D(Width, Height, TextureFormat.R8, false, true);
-                _yTex.filterMode = FilterMode.Bilinear;
-                _yTex.name = $"H265_Y_Mon{MonitorIndex}";
-
-                _uvTex = new Texture2D(Width / 2, Height / 2, TextureFormat.RG16, false, true);
-                _uvTex.filterMode = FilterMode.Bilinear;
-                _uvTex.name = $"H265_UV_Mon{MonitorIndex}";
-
-                _outputRt = new RenderTexture(Width, Height, 0, RenderTextureFormat.ARGB32);
-                _outputRt.useMipMap = true;
-                _outputRt.autoGenerateMips = false;
-                _outputRt.filterMode = FilterMode.Trilinear;
-                _outputRt.anisoLevel = 8;
-                _outputRt.name = $"H265_Output_Mon{MonitorIndex}";
-                _outputRt.Create();
-                
-                // Re-bind to the material
-                if (_nv12Material != null)
-                {
-                    _nv12Material.SetTexture("_YTex", _yTex);
-                    _nv12Material.SetTexture("_UVTex", _uvTex);
-                }
-                
-                // Re-allocate the byte buffers
-                _yBuf = new byte[Width * Height];
-                _uvBuf = new byte[(Width / 2) * (Height / 2) * 2];
+                _noFrameTicks = 0;
+                _keyframeRequested = false;
+                return;
             }
+            _lastEncodedCountForStall = EncodedFramesReceived;
 
-            // Upload Y plane: always use stride-copy to produce exactly fWidth*fHeight bytes.
-            // Passing the raw buffer (which may be larger due to MediaCodec stride alignment)
-            // to LoadRawTextureData would throw an exception or produce a black texture.
+            if (_noFrameTicks == KEYFRAME_NUDGE_THRESHOLD && !_keyframeRequested && _decodedCount > 0)
             {
-                int yNeeded = fWidth * fHeight;
-                if (_yBuf == null || _yBuf.Length < yNeeded)
-                    _yBuf = new byte[yNeeded];
-
-                if (yStride == fWidth)
-                {
-                    // No padding: fast copy entire buffer (only the exact needed bytes)
-                    Buffer.BlockCopy(yData, 0, _yBuf, 0, yNeeded);
-                }
-                else
-                {
-                    // Stride padding present: copy row by row
-                    for (int row = 0; row < fHeight; row++)
-                        Buffer.BlockCopy(yData, row * yStride, _yBuf, row * fWidth, fWidth);
-                }
-                _yTex.LoadRawTextureData(_yBuf);
-                _yTex.Apply(false, false);
+                _keyframeRequested = true;
+                Debug.LogWarning($"{TAG} PC{MonitorIndex} Short stall {(_noFrameTicks / 60f):F1}s — nudging keyframe");
+                OnKeyframeNeeded?.Invoke(MonitorIndex);
             }
-
-            // ── Corruption detection (cheap: 16 sample points from Y plane) ──
-            if (CheckFrameCorruption(yData, fWidth, fHeight, yStride))
+            if (_noFrameTicks == KEYFRAME_STALL_THRESHOLD && _decodedCount > 0)
             {
-                if (!_corruptionSuspected || (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 2.0)
-                {
-                    _corruptionSuspected = true;
-                    _lastCorruptionTime = DateTime.UtcNow;
-                    AppLog.LogWarning($"{TAG} PC{MonitorIndex} CORRUPTION DETECTED: rapid luminance oscillation (decoded={_decodedCount}).");
-
-                    // Fire corruption event — TaintTrack handles flush + keyframe + P-frame gating
-                    OnCorruptionDetected?.Invoke(MonitorIndex);
-                    return; // Skip displaying this corrupted frame
-                }
+                Debug.LogWarning($"{TAG} PC{MonitorIndex} Stall 1.5s — flushing decoder");
+                _decoder.Flush();
+                _keyframeRequested = false;
+                OnKeyframeNeeded?.Invoke(MonitorIndex);
             }
-            else if (_corruptionSuspected && (DateTime.UtcNow - _lastCorruptionTime).TotalSeconds > 3.0)
-            {
-                // Corruption resolved (3s of clean frames)
-                _corruptionSuspected = false;
-                AppLog.Log($"{TAG} PC{MonitorIndex} Corruption resolved (3s clean)");
-            }
-
-            // Upload UV plane: always use stride-copy to produce exactly uvWidth*uvHeight*2 bytes.
-            // Android NV12 UV plane is interleaved (CbCr), RG16 format = 2 bytes per pixel.
-            {
-                int uvWidth    = fWidth  / 2;
-                int uvHeight   = fHeight / 2;
-                int uvRowBytes = uvWidth * 2; // RG16: 2 bytes per UV pixel
-                int uvNeeded   = uvRowBytes * uvHeight;
-
-                if (_uvBuf == null || _uvBuf.Length < uvNeeded)
-                    _uvBuf = new byte[uvNeeded];
-
-                if (uvStride == uvRowBytes)
-                {
-                    // No padding: fast copy exact needed bytes
-                    Buffer.BlockCopy(uvData, 0, _uvBuf, 0, uvNeeded);
-                }
-                else
-                {
-                    // Stride padding present: copy row by row
-                    for (int row = 0; row < uvHeight; row++)
-                        Buffer.BlockCopy(uvData, row * uvStride, _uvBuf, row * uvRowBytes, uvRowBytes);
-                }
-                _uvTex.LoadRawTextureData(_uvBuf);
-                _uvTex.Apply(false, false);
-            }
-
-            // Blit NV12 → RGBA output RenderTexture
-            Graphics.Blit(null, _outputRt, _nv12Material);
-
-            // Generate sharp mipmaps (Lanczos-2 kernel) for anti-shimmer in VR.
-            // Limited to 4 levels (1080→540→270→135) which is sufficient for typical
-            // VR viewing distances. Each level = 1 blit call with 4x4 kernel.
-            SharpMipGenerator.Generate(_outputRt, sharpness: 0.1f, maxMipLevels: 4);
-
-            // Fire callback (on main thread already)
-            OnTextureReady?.Invoke(MonitorIndex, _outputRt);
         }
 
-        // ──────────── Control ────────────
-
-        /// <summary>
-        /// Flush decoder on stream discontinuity (e.g., server restart, seek).
-        /// After flush, only keyframes are accepted until the reference chain is restored.
-        /// </summary>
         public void Flush()
         {
-            if (_initialized && !_disposed)
-            {
-                _decoder?.Flush();
-                _waitingForCleanIdr = true;
-                AppLog.Log($"{TAG} PC{MonitorIndex} Flushed — waiting for clean IDR before accepting P-frames");
-            }
+            if (_initialized && !_disposed) _decoder?.Flush();
         }
 
-        /// <summary>
-        /// Sample average luminance from Y-plane data (cheap: 16 sample points in 4x4 grid).
-        /// Y plane in NV12 is raw luminance: 0=black, 255=white.
-        /// </summary>
-        private float SampleAverageLuminance(byte[] yData, int width, int height, int stride)
-        {
-            if (yData == null || width == 0 || height == 0) return 0.5f;
-
-            float sum = 0f;
-            int samples = 0;
-
-            // Sample 4x4 grid (16 points) — very fast, avoids reading entire plane
-            for (int row = 1; row <= 4; row++)
-            {
-                int y = height * row / 5;
-                for (int col = 1; col <= 4; col++)
-                {
-                    int x = width * col / 5;
-                    int idx = y * stride + x;
-                    if (idx < yData.Length)
-                    {
-                        sum += yData[idx];
-                        samples++;
-                    }
-                }
-            }
-
-            return samples > 0 ? (sum / samples) / 255f : 0.5f;
-        }
-
-        /// <summary>
-        /// Check for frame corruption by detecting rapid luminance jumps.
-        /// Returns true if corruption is suspected.
-        /// </summary>
-        private bool CheckFrameCorruption(byte[] yData, int width, int height, int stride)
-        {
-            float avgLum = SampleAverageLuminance(yData, width, height, stride);
-
-            if (_prevAvgLuminance < 0f)
-            {
-                _prevAvgLuminance = avgLum;
-                return false;
-            }
-
-            float delta = Mathf.Abs(avgLum - _prevAvgLuminance);
-            _prevAvgLuminance = avgLum;
-
-            if (delta > LUMINANCE_JUMP_THRESHOLD)
-            {
-                var now = DateTime.UtcNow;
-
-                // Reset jump count if too much time has passed (legitimate scene change)
-                if ((now - _lastLuminanceJumpTime).TotalSeconds > LUMINANCE_JUMP_WINDOW_SECONDS)
-                    _luminanceJumpCount = 0;
-
-                _luminanceJumpCount++;
-                _lastLuminanceJumpTime = now;
-
-                // Multiple rapid jumps = corruption (legitimate changes are usually sustained, not oscillating)
-                if (_luminanceJumpCount >= LUMINANCE_JUMP_TRIGGER)
-                {
-                    _luminanceJumpCount = 0;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public void SetFlipY(bool flip)
-        {
-            _flipY = flip;
-            if (_nv12Material != null)
-                _nv12Material.SetFloat("_FlipY", _flipY ? 1f : 0f);
-        }
-
-        public void SetFullRange(bool fullRange)
-        {
-            _fullRange = fullRange;
-            if (_nv12Material != null)
-                _nv12Material.SetFloat("_FullRange", _fullRange ? 1f : 0f);
-        }
+        public void SetFlipY(bool flip) { _flipY = flip; }
+        public void SetFullRange(bool fr) { /* surface mode ignores */ }
 
         // ──────────── IDisposable ────────────
 
@@ -569,16 +265,13 @@ namespace VRWorkspace.Streaming
             if (_disposed) return;
             _disposed = true;
 
+            // Dispose the decoder last — it owns both the Java Surface +
+            // SurfaceTexture refs and the externally-wrapped Unity Texture2D.
             _decoder?.Dispose();
             _decoder = null;
 
-            if (_yTex   != null) { UnityEngine.Object.Destroy(_yTex);   _yTex   = null; }
-            if (_uvTex  != null) { UnityEngine.Object.Destroy(_uvTex);  _uvTex  = null; }
-            if (_outputRt != null) { _outputRt.Release(); UnityEngine.Object.Destroy(_outputRt); _outputRt = null; }
-            if (_nv12Material != null) { UnityEngine.Object.Destroy(_nv12Material); _nv12Material = null; }
-
             _initialized = false;
-            AppLog.Log($"{TAG} PC{MonitorIndex} Disposed (decoded={_decodedCount})");
+            Debug.Log($"{TAG} PC{MonitorIndex} Disposed (decoded={_decodedCount})");
         }
 
         // ──────────── Helpers ────────────
@@ -586,7 +279,10 @@ namespace VRWorkspace.Streaming
         private static long GetTimestampUs()
             => _stopwatch.ElapsedTicks * 1_000_000 / System.Diagnostics.Stopwatch.Frequency;
 
+        private static long NowMs()
+            => _stopwatch.ElapsedMilliseconds;
+
         public override string ToString()
-            => $"H265StreamReceiver[mon={MonitorIndex}, {Width}x{Height}, decoded={_decodedCount}]";
+            => $"H265StreamReceiver PC{MonitorIndex} {Width}x{Height} {(IsH264 ? "H264" : "HEVC")} directSurface";
     }
 }

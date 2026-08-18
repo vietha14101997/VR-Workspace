@@ -21,8 +21,7 @@ namespace VRWorkspace.UI.Effects
         private RectTransform _rt;
         private Vector2 _dir;
 
-        // Throttle dirty notifications to reduce render overhead
-        private float _lastNotifyTime;
+        private float _lastUpdateTime;
         private const float NOTIFY_INTERVAL = 0.1f; // 100ms = 10 FPS dirty updates max
 
         /// <summary>
@@ -30,10 +29,21 @@ namespace VRWorkspace.UI.Effects
         /// </summary>
         public event Action OnAnimationUpdate;
 
-        void Start()
+        private void Awake()
         {
             _rt = GetComponent<RectTransform>();
             RandomizeDirection();
+        }
+
+        private void OnEnable()
+        {
+            _lastUpdateTime = Time.time;
+            InvokeRepeating(nameof(AdvanceAnimation), NOTIFY_INTERVAL, NOTIFY_INTERVAL);
+        }
+
+        private void OnDisable()
+        {
+            CancelInvoke(nameof(AdvanceAnimation));
         }
 
         void RandomizeDirection()
@@ -67,10 +77,15 @@ namespace VRWorkspace.UI.Effects
             }
         }
 
-        void Update()
+        private void AdvanceAnimation()
         {
+            float now = Time.time;
+            float elapsed = now - _lastUpdateTime;
+            _lastUpdateTime = now;
+
             if (!IsEnabled || _rt == null) return;
-            _rt.anchoredPosition += _dir * speed * Time.deltaTime;
+
+            _rt.anchoredPosition += _dir * speed * elapsed;
 
             float halfW = range.x / 2f + 50f;
             float halfH = range.y / 2f + 50f;
@@ -81,13 +96,7 @@ namespace VRWorkspace.UI.Effects
             if (_rt.anchoredPosition.x > halfW) _rt.anchoredPosition = new Vector2(-halfW, Random.Range(-halfH, halfH));
             else if (_rt.anchoredPosition.x < -halfW) _rt.anchoredPosition = new Vector2(halfW, Random.Range(-halfH, halfH));
 
-            // Throttle dirty notifications to reduce render overhead
-            // Only notify at NOTIFY_INTERVAL (10 FPS) instead of every frame
-            if (Time.time - _lastNotifyTime >= NOTIFY_INTERVAL)
-            {
-                _lastNotifyTime = Time.time;
-                OnAnimationUpdate?.Invoke();
-            }
+            OnAnimationUpdate?.Invoke();
         }
     }
 

@@ -44,6 +44,7 @@ namespace VRWorkspace.UI.RTT.Controllers
         // Remote audio playback (auto-created when streaming starts)
         private RemoteAudioPlayer _audioPlayer;
         private DataChannelAudioPlayer _dcAudioPlayer; // Fallback: Opus via DataChannel when Audio PC ICE fails
+        private bool _mediaRelayActive; // True when media relay (WebSocket fallback) is active
 
         // Cursor tracking
         private int _activeCursorPanelIndex = -1;
@@ -308,8 +309,19 @@ namespace VRWorkspace.UI.RTT.Controllers
         }
 
         /// <summary>
-        /// Get or create a RenderTexture with mipmaps for anti-aliasing.
-        /// This eliminates moire/aliasing artifacts when viewing panels at distance.
+        /// Get a RenderTexture suitable for the panel material to sample.
+        ///
+        /// Plan A: NO mipmap generation here. Just return the source directly.
+        /// Previously this function built a SECOND mipmap RT (Blit +
+        /// SharpMipGenerator.Generate) every time the source was non-mipmap.
+        /// That was 6 extra GPU dispatches per panel per frame and re-introduced
+        /// the half-built mip texel artifact on tab switches.
+        ///
+        /// Plan C update: the new H265StreamReceiver passes a Texture2D
+        /// (the bridge's shared MediaCodec output texture). We now pass-through
+        /// ANY Texture in the fast path so the panel samples the same texture
+        /// MediaCodec writes to — exactly one GL handle producer→consumer,
+        /// zero copies.
         /// </summary>
         private RenderTexture GetMipmapTexture(int index, Texture source, float mipSharpness = 0.1f)
         {
@@ -318,48 +330,65 @@ namespace VRWorkspace.UI.RTT.Controllers
                 return null;
             }
 
-            // Lazy init array
+            // Plan A / Plan C fast path: any RenderTexture source passes through
+            // directly. No copy, no Blit, no mipmap generation. Plan A's whole
+            // point is to reduce GPU stages to minimize partial-state artifacts.
+            if (source is RenderTexture srcRt)
+            {
+                return srcRt;
+            }
+
+            // Plan C: Texture2D sources (the new direct-surface bridge shared
+            // texture) also pass through. The panel material samples whatever
+            // the producer writes into; no intermediate Blit needed.
+            if (source is Texture2D)
+            {
+                return null; // signal "no RT, panel should use the source directly"
+            }
+
+            // Fallback path (legacy Editor/byte-buffer path) — kept for safety
+            // but should no longer be reached in production.
             if (_mipmapTextures == null)
                 _mipmapTextures = new RenderTexture[16]; // Max 16 monitors
 
             if (index < 0 || index >= _mipmapTextures.Length)
                 return null;
 
-            // Check if we need to create or resize
+            // Grow-only RT strategy: only resize if the source is BIGGER than the
+            // cached RT. A smaller source is just Blit'd with ScaleToFit into the
+            // larger RT, which is a single GPU pass instead of Release()+Create().
+            // This eliminates the per-frame "size changed" stall that happened
+            // every time the host window resized.
             var rt = _mipmapTextures[index];
-            if (rt == null || rt.width != source.width || rt.height != source.height)
+            if (rt == null || rt.width < source.width || rt.height < source.height)
             {
-                // Cleanup old
                 if (rt != null)
                 {
                     rt.Release();
                     Destroy(rt);
                 }
 
-                // Create new RenderTexture with mipmaps
                 rt = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32);
                 rt.useMipMap = true;
                 rt.autoGenerateMips = false; // Manual generation for reliability
                 rt.filterMode = FilterMode.Trilinear;
-                rt.anisoLevel = 16; // Maximum anisotropic filtering for VR
+                rt.anisoLevel = 4; // Aniso 4 is plenty for desktop UI; 16 was overkill
                 rt.Create();
-                rt.mipMapBias = 0f; // Bias handled by shader _MipMapBias property to avoid double-bias
+                rt.mipMapBias = 0f; // Bias handled by shader _MipMapBias property
 
                 _mipmapTextures[index] = rt;
                 Debug.Log($"[RTTRemote-MIPMAP] Created mipmap RT for panel {index}: {source.width}x{source.height}, sourceType={source.GetType().Name}");
             }
 
-            // Copy source to mipmap texture and generate sharp mipmaps
+            // Copy source to mipmap texture (ScaleToFit handles smaller sources)
+            // and generate sharp mipmaps using Lanczos-2 kernel.
             try
             {
                 var prevRT = RenderTexture.active;
-                RenderTexture.active = rt;
                 Graphics.Blit(source, rt);
                 RenderTexture.active = prevRT;
 
-                // Generate sharp mipmaps using Lanczos-2 kernel instead of blurry box filter.
-                // This preserves edge detail (text sharpness) while still anti-aliasing (no shimmer).
-                SharpMipGenerator.Generate(rt, sharpness: mipSharpness, maxMipLevels: 4);
+                SharpMipGenerator.Generate(rt, sharpness: mipSharpness, maxMipLevels: 3);
             }
             catch (System.Exception ex)
             {
@@ -646,7 +675,7 @@ namespace VRWorkspace.UI.RTT.Controllers
             // Add RTTMiniFrame first (required component)
             RTTMiniFrame frame = taskbarObj.AddComponent<RTTMiniFrame>();
             frame.Configure(
-                sec1Capacity: 6,    // Back, Bitrate, FPS, Zoom, Passthrough, Recenter
+                sec1Capacity: 6,    // Back, Resolution, FPS, Screen Settings, Light, Recenter
                 sec2Capacity: 3,    // 3 monitor slots
                 btnSize: 90f,
                 btnSpacing: 12f,
@@ -762,52 +791,75 @@ namespace VRWorkspace.UI.RTT.Controllers
         /// <summary>
         /// Create RemoteAudioPlayer dynamically for desktop audio playback.
         /// Auto-subscribes to OnRemoteAudioTrackReceived from ViewModel.
+        ///
+        /// Audio routing after server-side Opus RTP migration:
+        ///   - Host default path is Opus RTP with DTX (LATENCY_CONSTRAINED_VBR)
+        ///   - USB transport still uses raw PCM16 over the audio DataChannel
+        ///   - Media relay also uses Opus RTP
+        /// Therefore the RTP player is the primary sink; the DC player is kept
+        /// as fallback for USB connections only and auto-unmutes if DC data arrives.
         /// </summary>
         private void CreateRemoteAudioPlayer()
         {
             CleanupRemoteAudioPlayer();
 
-            // Create RTP player FIRST — its Awake() calls AudioSettings.Reset() which kills all audio.
-            // DataChannelAudioPlayer.StartPlayback() must happen AFTER to survive the reset.
-            var rtpAudioObj = new GameObject("RemoteAudioPlayer");
-            rtpAudioObj.transform.SetParent(transform, false);
-            rtpAudioObj.AddComponent<AudioSource>();
-            _audioPlayer = rtpAudioObj.AddComponent<RemoteAudioPlayer>();
-            // Primary: RTP audio (independent UDP transport, not affected by H.265 SCTP congestion)
-
-            // Fallback: DataChannel audio (shares SCTP with H.265 video → congestion causes delay+distortion)
+            // 1. DC Player (Fallback) - receives raw PCM16 from the host DataChannel.
+            // Only active when host uses USB transport (UsePcmDataChannelAudio=true).
             var dcAudioObj = new GameObject("DataChannelAudioPlayer");
             dcAudioObj.transform.SetParent(transform, false);
             dcAudioObj.AddComponent<AudioSource>();
             _dcAudioPlayer = dcAudioObj.AddComponent<DataChannelAudioPlayer>();
-            _dcAudioPlayer.StartPlayback(); // Must be AFTER RemoteAudioPlayer's AudioSettings.Reset()
-            _dcAudioPlayer.SetMute(true); // Muted: RTP audio is primary (DC shares SCTP with H.265 video)
+            _dcAudioPlayer.StartPlayback();
+            _dcAudioPlayer.SetMute(true); // Fallback: muted — only used if host sends raw PCM via DC (USB)
+
+            // 2. RTP Player (Primary) - the host now sends Opus RTP by default across
+            // both P2P Direct and Relay connections (LATENCY_CONSTRAINED_VBR + DTX).
+            var rtpAudioObj = new GameObject("RemoteAudioPlayer");
+            rtpAudioObj.transform.SetParent(transform, false);
+            rtpAudioObj.AddComponent<AudioSource>();
+            _audioPlayer = rtpAudioObj.AddComponent<RemoteAudioPlayer>();
+            _audioPlayer.SetMute(false); // Primary: unmuted — host sends Opus RTP with DTX
 
             if (_viewModel != null)
             {
                 _viewModel.OnDCAudioData += HandleDCAudioData;
                 _viewModel.OnRemoteAudioTrackReceived += _audioPlayer.SetTrack;
+                _viewModel.OnMediaRelayStateChanged += HandleMediaRelayStateChanged;
 
-                // Audio track may already be cached (OnTrack fires in Phase 2, before player is created in Phase 3)
                 var cachedTrack = _viewModel.CachedAudioTrack;
                 if (cachedTrack != null)
                 {
-                    Debug.Log("[RTTRemoteMenuController] Using cached audio track for RTP player");
+                    Debug.Log("[RTTRemoteMenuController] Cached audio track wired to RTP player (primary)");
                     _audioPlayer.SetTrack(cachedTrack);
                 }
             }
 
-            Debug.Log("[RTTRemoteMenuController] Created audio players (RTP primary, DC fallback muted)");
+            Debug.Log("[RTTRemoteMenuController] Created audio players (RTP primary unmuted, DC fallback muted)");
         }
+
+        private bool _dcAudioSwitched = false;
 
         private void HandleDCAudioData(byte[] data)
         {
-            // DataChannel audio fallback — feeds DC player (muted unless RTP fails).
-            // DC shares SCTP with H.265 video, causing congestion. RTP is primary.
-            if (_dcAudioPlayer != null)
+            if (_dcAudioPlayer == null) return;
+
+            // If the host sends raw PCM16 via DataChannel (USB transport only),
+            // auto-unmute DC player and mute RTP player for that session.
+            if (!_dcAudioSwitched)
             {
-                _dcAudioPlayer.OnOpusFrame(data, 0, data.Length);
+                _dcAudioSwitched = true;
+                _dcAudioPlayer.SetMute(false);
+                if (_audioPlayer != null) _audioPlayer.SetMute(true);
+                Debug.Log("[RTTRemoteMenuController] DC audio data detected — switching to DC primary");
             }
+            _dcAudioPlayer.OnPCMFrame(data, 0, data.Length);
+        }
+
+        private void HandleMediaRelayStateChanged(bool active)
+        {
+            _mediaRelayActive = active;
+            // RTP is primary in both direct and relay modes.
+            Debug.Log($"[RTTRemoteMenuController] Media relay {(active ? "active" : "stopped")}: RTP audio remains primary");
         }
 
         /// <summary>
@@ -828,18 +880,21 @@ namespace VRWorkspace.UI.RTT.Controllers
                 _audioPlayer = null;
             }
 
-            // Cleanup DataChannel audio player (fallback, muted)
+            // Cleanup DataChannel audio player (fallback)
             if (_dcAudioPlayer != null)
             {
                 if (_viewModel != null)
                 {
                     _viewModel.OnDCAudioData -= HandleDCAudioData;
+                    _viewModel.OnMediaRelayStateChanged -= HandleMediaRelayStateChanged;
                 }
 
                 _dcAudioPlayer.StopAudio();
                 Destroy(_dcAudioPlayer.gameObject);
                 _dcAudioPlayer = null;
             }
+
+            _dcAudioSwitched = false;
         }
 
         /// <summary>

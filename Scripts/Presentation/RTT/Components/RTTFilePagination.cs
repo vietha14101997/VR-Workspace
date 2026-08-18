@@ -153,6 +153,7 @@ namespace VRWorkspace.UI.RTT.Components
             // Ensure visible if was hidden
             SetQuadAlpha(0f);
             gameObject.SetActive(true);
+            SetVisible(true);
 
             if (_fadeCoroutine != null) StopCoroutine(_fadeCoroutine);
 
@@ -228,6 +229,7 @@ namespace VRWorkspace.UI.RTT.Components
             _isShown = false;
             SetQuadAlpha(0f);
             gameObject.SetActive(false);
+            SetVisible(false);
         }
 
         /// <summary>
@@ -243,6 +245,7 @@ namespace VRWorkspace.UI.RTT.Components
             }
 
             gameObject.SetActive(true);
+            SetVisible(true);
             SetQuadAlpha(1f);
             _isShown = true;
             _lastShowTime = Time.time;

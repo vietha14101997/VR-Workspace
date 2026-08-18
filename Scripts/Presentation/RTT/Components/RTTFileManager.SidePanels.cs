@@ -10,6 +10,8 @@ using VRWorkspace.Media.Core;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Services;
 using VRWorkspace.Utilities;
+using VRWorkspace.Presentation.Input.VCS;
+using VRWorkspace.Domain.Input;
 
 namespace VRWorkspace.UI.RTT.Components
 {
@@ -314,6 +316,19 @@ namespace VRWorkspace.UI.RTT.Components
                 _font
             );
 
+            // Register the action bar as a VCS surface so the cursor can traverse
+            // from the Right Side Panel downward into the bar (mirrors Main → Pagination).
+            float frameHeight = RTTToolbar.Instance != null && RTTToolbar.Instance.TaskbarHeight > 0
+                ? RTTToolbar.Instance.TaskbarHeight
+                : 0.12f;
+            var barCtrl = ActionBarSurfaceController.Attach(
+                _fileActionBar.gameObject,
+                panelWidth,
+                frameHeight,
+                _rightFrame);
+            // Mirror bar visibility into VCS
+            _fileActionBar.OnVisibilityChanged += visible => barCtrl?.NotifyVisible(visible);
+
             // Wire up events
             _fileActionBar.OnOpenClicked += OnActionBarOpenClicked;
             _fileActionBar.OnRenameClicked += OnActionBarRenameClicked;
@@ -413,6 +428,22 @@ namespace VRWorkspace.UI.RTT.Components
 
                         // Fade in the frame quads
                         FadeInAllFrames();
+
+                        // Explicitly re-home the cursor onto File Manager's own surface.
+                        // The DirectVideoPlayer's HidePlayerUI() tries to do this too, but it
+                        // discovers its return surface via GetComponentInParent<RTTMenuFrame>()
+                        // starting from its own hierarchy — and DirectVideoPlayer is parented
+                        // under RTTManager.transform (a sibling of _menuFrame, not a child of
+                        // it), so that lookup finds nothing there. File Manager knows exactly
+                        // which surface it's returning to, so do it here instead.
+                        if (_menuFrame != null)
+                        {
+                            var menuSurfaceId = RTTCanvasAutoRegistrar.Instance?.TryGetSurfaceId(_menuFrame);
+                            if (menuSurfaceId.HasValue)
+                            {
+                                VirtualCursorSpace.Instance?.SnapCursorTo(menuSurfaceId.Value);
+                            }
+                        }
                     }
                 );
 

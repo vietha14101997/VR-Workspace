@@ -22,6 +22,10 @@ using VRWorkspace.Media.UI;
 using VRWorkspace.Media.Utils;
 using VRWorkspace.UI.RTT.Components;
 using VRWorkspace.Presentation.Media.Controllers;
+using VRWorkspace.Domain.Input;
+using VRWorkspace.Presentation.Input.Mode;
+using VRWorkspace.Presentation.Input.Cursor;
+using VRWorkspace.Presentation.Input.VCS;
 
 namespace VRWorkspace.Media.Core
 {
@@ -124,6 +128,7 @@ namespace VRWorkspace.Media.Core
             _settingsPanel = r.SettingsPanel;
             _menuButtonFrameObject = r.MenuButtonFrameObject;
             _menuButtonQuadOriginalScale = r.MenuButtonQuadOriginalScale;
+            _hubSurfaceController = r.HubSurfaceController;
             _errorDialog = r.ErrorDialog;
             _sideControlsBaseX = r.SideControlsBaseX;
             _sideControlsBaseY = r.SideControlsBaseY;
@@ -135,12 +140,25 @@ namespace VRWorkspace.Media.Core
             _uiSettingsPopupFrame = r.UISettingsPopupFrame;
             _uiSettingsBlocker = r.UISettingsBlocker;
 
-            // Wire dismiss overlay button
+            // Wire dismiss overlay button — smart dismiss/wake-up
+            // (overlay stays active so this button works both as Hide trigger and wake-up trigger)
             if (r.DismissButton != null)
             {
                 r.DismissButton.onClick.AddListener(() =>
                 {
-                    _controlsPanel?.Hide();
+                    Debug.Log("[VAC_DBG-J] DismissButton clicked, controlsPanel.IsVisible=" +
+                        (_controlsPanel != null ? _controlsPanel.IsVisible.ToString() : "null"));
+                    if (_controlsPanel != null)
+                    {
+                        if (_controlsPanel.IsVisible)
+                        {
+                            _controlsPanel.Hide();
+                        }
+                        else
+                        {
+                            _controlsPanel.Show(); // wake-up from hidden
+                        }
+                    }
                     _playerController?.HideProjectionPopup();
                     _playerController?.HideEnvironmentPopup();
                 });
@@ -164,8 +182,77 @@ namespace VRWorkspace.Media.Core
             // Hide UI settings popup when controls panel hides
             _controlsPanel.OnVisibilityChanged += (visible) =>
             {
-                if (!visible) HideUISettingsPopup();
+                Debug.Log($"[VAC_DBG-G] OnVisibilityChanged fired, visible={visible}, _cursorUVOnHide={_cursorUVOnHide}");
+                var vcs = VirtualCursorSpace.Instance;
+
+                if (!visible)
+                {
+                    HideUISettingsPopup();
+                    // Lock cursor movement so mouse delta doesn't drift it during hidden state
+                    if (vcs != null) vcs.CursorMovementLocked = true;
+
+                    // Save cursor UV position for restore on wake-up
+                    if (vcs != null && vcs.Cursor.SurfaceId.HasValue)
+                    {
+                        _cursorUVOnHide = vcs.Cursor.UV;
+                        Debug.Log($"[VAC_DBG-G] HID path: saved cursor UV={_cursorUVOnHide}, locked movement");
+                        // Snap cursor to center of mediaPlayer bounds so click target is predictable
+                        vcs.SetCursorUV(new Vector2(0.5f, 0.5f));
+                    }
+
+                    // Explicitly hide the cursor visual now, via a hard override that can't
+                    // be undone by the normal surface-based show logic later in the same
+                    // frame. Don't rely solely on VirtualSurface.IsVisible propagating through
+                    // WorldSpaceCursorRenderer: MediaPlayerHubSurfaceController re-registers a
+                    // brand-new VirtualSurface whenever the hub bounds change (e.g.
+                    // side/settings frames toggling active on Hide()), and that race can leave
+                    // the surface briefly/incorrectly visible depending on frame timing.
+                    WorldSpaceCursorRenderer.Instance?.SetForceHidden(true);
+                }
+                else
+                {
+                    // Unlock cursor movement so user can interact again
+                    if (vcs != null) vcs.CursorMovementLocked = false;
+
+                    // Restore cursor position on wake-up (was saved on Hide)
+                    if (_cursorUVOnHide.x >= 0f && vcs != null)
+                    {
+                        Debug.Log($"[VAC_DBG-G] SHOW path: restoring cursor UV to {_cursorUVOnHide}, unlocked movement");
+                        vcs.SetCursorUV(_cursorUVOnHide);
+                        _cursorUVOnHide = new Vector2(-1f, -1f);
+                    }
+                    else
+                    {
+                        Debug.Log($"[VAC_DBG-G] SHOW path: no saved UV to restore (initial show or already restored)");
+                    }
+
+                    // Release the hard override so normal per-frame positioning/visibility
+                    // (driven by VirtualSurface.IsVisible) resumes. Positioning happens the
+                    // same frame in WorldSpaceCursorRenderer.LateUpdate, so there's no visible
+                    // jump to the wrong spot.
+                    WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
+                }
+
+                // Notify VCS surface — controls hidden → cursor goes out of bounds
+                _hubSurfaceController?.NotifyVisible(visible);
+
+                // Override menu button visibility (Bug 1 fix):
+                // RTTMediaControlsPanel.Hide() always shows menu button, but in Mouse/Gamepad
+                // mode we want menu button hidden (cursor handles show/hide via bounds).
+                if (!visible && ProjectionSystem != null && !ProjectionSystem.IsImmersiveProjection())
+                    PositionMenuButtonFlat();
+                ApplyMenuButtonVisibilityByMode(CurrentModeFromState());
             };
+
+            // Phase 5: Menu button is hidden in Mouse/Gamepad mode (cursor handles show/hide).
+            // Only visible in Gaze mode (reticle user needs the toggle button).
+            ApplyMenuButtonVisibilityByMode(InputModeController.Instance != null
+                ? CurrentModeFromState()
+                : InputMode.Gaze);
+            if (InputModeController.Instance != null)
+            {
+                InputModeController.Instance.OnInputModeChanged += ApplyMenuButtonVisibilityByMode;
+            }
 
             // Wire menu show button
             if (r.MenuShowButton != null)
@@ -250,17 +337,73 @@ namespace VRWorkspace.Media.Core
                 _controlsPanel.ResetToQueueView();
                 _controlsPanel.Show();
             }
+
+            // TEMP DIAGNOSTIC: log every cursor surface/UV change while the player UI is
+            // open, so we can see exactly which surface the cursor is really on when it
+            // "escapes" instead of guessing further. Search the log for "[VCS_DBG]".
+            // Safe to remove once the escape bug is confirmed fixed.
+            VirtualCursorSpace.DebugLogging = true;
+
+            // Hand the VCS cursor off onto the Hub surface. Nothing does this
+            // automatically: CursorAppFollower only snaps the cursor onto the media
+            // app's outer RTTMenuFrame when the app first opens, and nothing after that
+            // ever moves it onto the Hub/Controls/Queue/Settings surfaces this player UI
+            // just built. Without this, the cursor stays parked on that much larger
+            // outer surface (EdgePolicy.All, sized to the whole app window) for the rest
+            // of the session — free to roam the entire app window well outside the
+            // controls/hub staircase, which is exactly the "cursor escapes" symptom.
+            if (_hubSurfaceController != null)
+            {
+                VirtualCursorSpace.Instance?.SnapCursorTo(
+                    _hubSurfaceController.SurfaceId, preserveWorldPosition: true);
+            }
         }
 
         private void HidePlayerUI()
         {
+            _errorDialog?.HideImmediate();
             _uiSettingsPopupFrame?.SetActive(false);
             _uiSettingsBlocker?.SetActive(false);
             _controlsFollowCamera = false;
 
+            // Must run BEFORE deactivating _controlsContainer below. SetActive(false) alone
+            // stops MediaPlayerHubSurfaceController's LateUpdate (so it never unregisters
+            // itself) and drags the world-space cursor — parented under this hierarchy's
+            // display quad — down to activeInHierarchy=false with nothing to hand it off
+            // to. Explicitly unregistering lets VCS fall back to the next highest-priority
+            // visible surface (Library/FileManager, already shown by this point) and
+            // re-home the cursor there. Also release any leftover force-hidden override
+            // in case we're exiting while controls happened to be hidden.
+            _hubSurfaceController?.Unregister();
+            WorldSpaceCursorRenderer.Instance?.SetForceHidden(false);
+
+            // Belt-and-suspenders: don't rely solely on VCS's automatic
+            // highest-priority-visible fallback triggered by Unregister() above — its
+            // correctness depends on the Library/FileManager RTTMenuFrame surface having
+            // already flipped to IsVisible=true by this exact point (via ShowLibraryUI()
+            // above firing RTTCanvasBase.OnEnable synchronously), which is timing-sensitive
+            // and easy to silently break with future changes. Explicitly snap the cursor
+            // onto the menu frame surface so it deterministically ends up somewhere valid.
+            if (_parentMenuFrame != null)
+            {
+                var menuSurfaceId = RTTCanvasAutoRegistrar.Instance?.TryGetSurfaceId(_parentMenuFrame);
+                if (menuSurfaceId.HasValue)
+                {
+                    VirtualCursorSpace.Instance?.SnapCursorTo(menuSurfaceId.Value);
+                }
+                else
+                {
+                    Debug.LogWarning("[VRMediaAppController] HidePlayerUI: menu frame has no registered VCS surface yet — cursor may be stranded.");
+                }
+            }
+
             _controlsPanel?.gameObject.SetActive(false);
             _controlsContainer?.SetActive(false);
         }
+
+        // Phase 2+3: cursor UV saved when controls hide, restored when controls show.
+        // Sentinel value (-1,-1) means "no saved UV".
+        private Vector2 _cursorUVOnHide = new Vector2(-1f, -1f);
 
         #endregion
 
@@ -359,6 +502,28 @@ namespace VRWorkspace.Media.Core
                 _playerControlsBaseLocalPos + new Vector3(0, _uiHeightOffset, -_uiDepthOffset);
         }
 
+        // Phase 5: Menu button visibility follows input mode.
+        // Gaze mode: menu button visible (reticle user toggles controls).
+        // Mouse/Gamepad mode: menu button hidden (cursor handles show/hide via bounds).
+        private void ApplyMenuButtonVisibilityByMode(InputMode mode)
+        {
+            if (_menuButtonFrameObject == null) return;
+            // Only show menu button when controls are HIDDEN (it exists to bring controls back).
+            bool showMenuButton = (mode == InputMode.Gaze) && !_controlsPanel.IsVisible;
+            _menuButtonFrameObject.SetActive(showMenuButton);
+        }
+
+        private InputMode CurrentModeFromState()
+        {
+            var field = typeof(InputModeController).GetField("_currentMode",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null && InputModeController.Instance != null)
+            {
+                return (InputMode)field.GetValue(InputModeController.Instance);
+            }
+            return InputMode.Gaze;
+        }
+
         private void ScaleMenuButtonQuad(float scaleFactor)
         {
             if (_menuButtonFrameObject == null) return;
@@ -408,9 +573,17 @@ namespace VRWorkspace.Media.Core
             if (_menuButtonFrameObject == null) return;
 
             float menuBtnPhysical = 90f / 1200f;
-            Vector3 pos = _menuFramePosition + new Vector3(0, -0.5f - menuBtnPhysical * 1.5f, 0);
+            bool hasProjectionAnchor = ProjectionSystem != null && ProjectionSystem.HasSavedFlatTransform;
+            Vector3 anchorPosition = hasProjectionAnchor
+                ? ProjectionSystem.FlatWorldPosition
+                : _menuFramePosition;
+            Quaternion anchorRotation = hasProjectionAnchor
+                ? ProjectionSystem.ProjectionRotation
+                : _menuFrameRotation;
+
+            Vector3 pos = anchorPosition + Vector3.up * (-0.5f - menuBtnPhysical * 1.5f);
             _menuButtonFrameObject.transform.position = pos;
-            _menuButtonFrameObject.transform.rotation = _menuFrameRotation;
+            _menuButtonFrameObject.transform.rotation = anchorRotation;
             ScaleMenuButtonQuad(1.0f);
             _menuButtonFollowCamera = false;
 

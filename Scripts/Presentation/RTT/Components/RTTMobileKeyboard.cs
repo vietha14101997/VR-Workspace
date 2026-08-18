@@ -25,6 +25,18 @@ namespace VRWorkspace.UI.RTT.Components
         private static RTTMobileKeyboard _instance;
         public static RTTMobileKeyboard Instance => _instance;
         public static RTTMobileKeyboard CurrentlyOpenKeyboard { get; private set; }
+
+        /// <summary>
+        /// Reset static singletons at the start of each Play session.
+        /// Without this, _instance and CurrentlyOpenKeyboard keep ghost references to
+        /// destroyed keyboards on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+            CurrentlyOpenKeyboard = null;
+        }
         #endregion
 
         #region Configuration
@@ -78,6 +90,12 @@ namespace VRWorkspace.UI.RTT.Components
         public event Action OnBackspacePressed;
         public event Action OnEnterPressed;
         public event Action OnClosePressed;
+
+        /// <summary>Phase 11 VCS hook: fired after Show() has positioned + visible'd the keyboard.</summary>
+        public event Action OnKeyboardShown;
+
+        /// <summary>Phase 11 VCS hook: fired at the start of Hide() before resources are released.</summary>
+        public event Action OnKeyboardHidden;
         #endregion
 
         #region Private Fields
@@ -867,6 +885,7 @@ namespace VRWorkspace.UI.RTT.Components
             MarkDirty();
 
             Debug.Log("[RTTMobileKeyboard] Shown");
+            OnKeyboardShown?.Invoke();
         }
 
         [Header("Resource Management")]
@@ -876,6 +895,7 @@ namespace VRWorkspace.UI.RTT.Components
         public new void Hide()
         {
             base.Hide(); // Call base to properly set visibility
+            OnKeyboardHidden?.Invoke();
             _targetInputField = null;
 
             if (CurrentlyOpenKeyboard == this)

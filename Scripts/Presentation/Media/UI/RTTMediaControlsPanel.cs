@@ -4,6 +4,8 @@ using UnityEngine.EventSystems;
 using System;
 using System.Collections;
 using TMPro;
+using VRWorkspace.Domain.Input;
+using VRWorkspace.Presentation.Input.Mode;
 using VRWorkspace.UI.HoverEffects;
 using VRWorkspace.UI.RTT;
 using VRWorkspace.UI.RTT.Components;
@@ -1162,17 +1164,25 @@ namespace VRWorkspace.Media.UI
         /// </summary>
         public void Show()
         {
+            Debug.Log($"[RTTCP_DBG-F] Show() called, gameObject.activeSelf={gameObject.activeSelf}, gameObject.activeInHierarchy={gameObject.activeInHierarchy}");
             if (_fadeCoroutine != null)
             {
                 StopCoroutine(_fadeCoroutine);
             }
             _fadeCoroutine = StartCoroutine(FadeIn());
             IsVisible = true;
+            Debug.Log($"[RTTCP_DBG-F] Show() set IsVisible=true");
 
             // Re-enable parent frame's display quad collider (was disabled on hide)
             SetParentFrameColliderEnabled(true);
 
-            // Show overlay, hide menu button (controls visible → overlay catches dismiss clicks)
+            // Show overlay, hide menu button.
+            // The overlay covers the video display area with a transparent DismissButton.
+            // In Gaze mode its BoxCollider was the cause of the reticle "stuck on the
+            // video screen" symptom while controls were hidden — by keeping it active
+            // here (controls visible) the dwell-click dismiss path still works for the
+            // "click outside controls to hide them" interaction. See Hide() for the
+            // paired Gaze-mode deactivation logic.
             if (_overlayFrameObject != null) _overlayFrameObject.SetActive(true);
             if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(false);
             if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(true);
@@ -1205,8 +1215,21 @@ namespace VRWorkspace.Media.UI
             _fadeCoroutine = StartCoroutine(FadeOut());
             IsVisible = false;
 
-            // Hide overlay, show menu button (only menu button remains near video screen)
-            if (_overlayFrameObject != null) _overlayFrameObject.SetActive(false);
+            // Gaze mode: deactivate the overlay frame so the gaze reticle doesn't
+            // show on the video display area when controls are hidden (the overlay's
+            // 5x5m BoxCollider was being hit by Physics.Raycast as the user looked
+            // anywhere over the video screen, producing a "reticle stuck on the video"
+            // symptom). The Menu Button is the wake-up trigger in Gaze mode instead.
+            //
+            // Cursor mode (Mouse/Gamepad): keep the overlay ACTIVE so the DismissButton
+            // can serve as a wake-up trigger — the cursor moves on the invisible Hub
+            // surface and clicks anywhere on the overlay to bring controls back.
+            //
+            // The mode-dependent SetActive call is duplicated in the Show() path and
+            // in the OnInputModeChanged hook in VRMediaAppController so the overlay
+            // always reflects the right state when the mode flips while controls are
+            // hidden.
+            UpdateOverlayFrameForMode();
             if (_menuButtonFrameObject != null) _menuButtonFrameObject.SetActive(true);
             if (_sideControlsFrameObject != null) _sideControlsFrameObject.SetActive(false);
             if (_queuePagination != null) _queuePagination.HideImmediate();
@@ -1214,6 +1237,20 @@ namespace VRWorkspace.Media.UI
             _settingsFrameObject?.SetActive(false);
 
             OnVisibilityChanged?.Invoke(false);
+        }
+
+        /// <summary>
+        /// Activate/deactivate the dismiss overlay frame based on the current input mode.
+        /// Called from Hide() and from VRMediaAppController.OnInputModeChanged so the
+        /// overlay state stays synchronized when the user flips input devices while
+        /// controls are hidden.
+        /// </summary>
+        public void UpdateOverlayFrameForMode()
+        {
+            if (_overlayFrameObject == null) return;
+            var controller = InputModeController.Instance;
+            bool isGazeMode = controller != null && controller.Mode == InputMode.Gaze;
+            _overlayFrameObject.SetActive(!isGazeMode);
         }
 
 

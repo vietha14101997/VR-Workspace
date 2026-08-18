@@ -70,6 +70,8 @@ namespace VRWorkspace.Media.Core
 
         // Per-video settings cache: auto-save every 10s, restore on re-open
         private Coroutine _autoSaveCoroutine;
+        private Coroutine _recenterCoroutine;
+        private VRGazeReticle _recenterReticle;
         private VideoSettingsEntry _cachedEntry;  // pending restore (consumed after HandleVideoPrepared)
         private double _resumePosition = 0;
         private bool _isStopped = true; // Guard against double-Stop() corrupting saved settings
@@ -485,6 +487,8 @@ namespace VRWorkspace.Media.Core
         /// </summary>
         public void Stop()
         {
+            CancelRecenter();
+
             // Only save settings once (prevents second Stop() from overwriting good data with stale engine state)
             if (!_isStopped)
             {
@@ -1094,14 +1098,29 @@ namespace VRWorkspace.Media.Core
 
         private void HandleRecenter()
         {
+            if (_recenterCoroutine != null)
+            {
+                Debug.Log("[VRVideoPlayerController] Recenter already in progress");
+                return;
+            }
+
             Debug.Log("[VRVideoPlayerController] HandleRecenter called - starting VR recenter");
-            StartCoroutine(RecenterRoutine());
+            _recenterCoroutine = StartCoroutine(RecenterRoutine());
         }
 
         private System.Collections.IEnumerator RecenterRoutine()
         {
+            CardboardTrackingController tracking = CardboardTrackingController.Instance;
+            if (tracking == null) tracking = FindAnyObjectByType<CardboardTrackingController>();
+            if (tracking != null && !tracking.BeginManualRecenter(this))
+            {
+                _recenterCoroutine = null;
+                yield break;
+            }
+
             VRGazeReticle reticle = VRGazeReticle.Instance;
             if (reticle == null) reticle = FindAnyObjectByType<VRGazeReticle>();
+            _recenterReticle = reticle;
 
             // Load recenter icon from Resources (icon files are directly in Resources folder)
             Sprite recenterIcon = Resources.Load<Sprite>("icon_recenter");
@@ -1118,7 +1137,7 @@ namespace VRWorkspace.Media.Core
 
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 float progress = Mathf.Clamp01(elapsed / duration);
 
                 if (reticle != null)
@@ -1129,6 +1148,23 @@ namespace VRWorkspace.Media.Core
                 yield return null;
             }
 
+            float settleTimeout = 0.5f;
+            while (tracking != null && !tracking.IsRecenterSettled && settleTimeout > 0f)
+            {
+                settleTimeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (tracking != null && !tracking.IsRecenterSettled)
+            {
+                tracking.CancelManualRecenter(this);
+                if (reticle != null && !tracking.IsRecentering) reticle.ExitRecenterMode();
+                _recenterReticle = null;
+                _recenterCoroutine = null;
+                Debug.LogWarning("[VRVideoPlayerController] Recenter cancelled because tracking did not settle.");
+                yield break;
+            }
+
             // Recenter virtual objects and projection
             Camera cam = Camera.main;
             if (cam != null)
@@ -1136,15 +1172,30 @@ namespace VRWorkspace.Media.Core
                 RecenterAllVirtualObjects(cam);
             }
 
+            bool isImmersive = _projectionSystem != null &&
+                !ProjectionDetector.SupportsScreenSettings(_projectionSystem.CurrentProjection);
+
             // Also recenter video projection if it exists
             if (_projectionSystem != null)
             {
+                // In flat mode RecenterAllVirtualObjects already moved the screen with the
+                // rest of the workspace. Preserve that authoritative pose instead of
+                // replacing it with a hardcoded camera-relative target.
+                Vector3 transformedFlatPosition = _projectionSystem.ProjectionPosition;
+                Quaternion transformedFlatRotation = _projectionSystem.ProjectionRotation;
+
                 _projectionSystem.RecenterView();
 
-                // Update saved flat transform to camera forward — so controls and sphere alignment
-                // point toward the new forward direction instead of the old flat screen position
-                if (cam != null)
+                if (!isImmersive)
                 {
+                    _projectionSystem.UpdateSavedFlatTransform(
+                        transformedFlatPosition,
+                        transformedFlatRotation);
+                }
+                else if (cam != null)
+                {
+                    // Immersive projections retain the existing camera-forward reference
+                    // used to align controls and restore flat mode later.
                     Vector3 camFwd = cam.transform.forward;
                     camFwd.y = 0;
                     if (camFwd.sqrMagnitude < 0.001f) camFwd = Vector3.forward;
@@ -1158,7 +1209,6 @@ namespace VRWorkspace.Media.Core
             // Recenter VideoControlsContainer (now uses updated saved flat transform → camera forward)
             if (_controlsPanel != null && _projectionSystem != null)
             {
-                bool isImmersive = !ProjectionDetector.SupportsScreenSettings(_projectionSystem.CurrentProjection);
                 RepositionControlsForProjection(isImmersive);
             }
 
@@ -1170,12 +1220,39 @@ namespace VRWorkspace.Media.Core
                     _projectionSystem.CurrentStereoMode);
             }
 
+            tracking?.CompleteManualRecenter(this);
             if (reticle != null)
             {
-                reticle.ExitRecenterMode();
+                if (tracking == null || !tracking.IsRecentering)
+                    reticle.ExitRecenterMode();
             }
 
+            _recenterReticle = null;
+            _recenterCoroutine = null;
+
             Debug.Log("[VRVideoPlayerController] VR recenter complete.");
+        }
+
+        private void CancelRecenter()
+        {
+            if (_recenterCoroutine != null)
+            {
+                StopCoroutine(_recenterCoroutine);
+                _recenterCoroutine = null;
+            }
+
+            if (_recenterReticle != null)
+            {
+                CardboardTrackingController tracking = CardboardTrackingController.Instance;
+                tracking?.CancelManualRecenter(this);
+                if (tracking == null || !tracking.IsRecentering)
+                    _recenterReticle.ExitRecenterMode();
+                _recenterReticle = null;
+            }
+            else
+            {
+                CardboardTrackingController.Instance?.CancelManualRecenter(this);
+            }
         }
 
         private void RecenterAllVirtualObjects(Camera cam)
@@ -1285,21 +1362,12 @@ namespace VRWorkspace.Media.Core
         #region Unity Lifecycle
         private void Update()
         {
-            // Update video texture to projection (for frame updates)
-            if (_playbackEngine != null && _playbackEngine.IsPlaying && _projectionSystem != null)
-            {
-                if (_playbackEngine.UseNV12Output)
-                {
-                    _projectionSystem.SetTextureNV12(
-                        _playbackEngine.YPlaneTexture,
-                        _playbackEngine.UVPlaneTexture
-                    );
-                }
-                else
-                {
-                    _projectionSystem.SetTexture(_playbackEngine.OutputTexture);
-                }
-            }
+            // Removed per-frame SetTexture call.
+            // OutputTexture is already bound to the renderer in HandleVideoPrepared().
+            // VideoPlayer writes to targetTexture directly each frame; the shader
+            // sampler sees the new pixels without needing material.SetTexture rebinding.
+            // Per-frame rebinding caused material dirty flag + uniform upload overhead.
+            // NV12 path is bound once at Prepare and does not change handles during playback.
         }
 
         private void OnApplicationQuit()
@@ -1314,6 +1382,8 @@ namespace VRWorkspace.Media.Core
 
         private void OnDestroy()
         {
+            CancelRecenter();
+
             // Unwire events
             if (_playbackEngine != null)
             {

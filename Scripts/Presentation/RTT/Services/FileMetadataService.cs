@@ -29,6 +29,17 @@ namespace VRWorkspace.UI.RTT.Services
                 return _instance;
             }
         }
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, _instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
         #endregion
 
         private VideoPlayer _videoPlayer;
@@ -992,6 +1003,8 @@ namespace VRWorkspace.UI.RTT.Services
             _isPreloading = true;
             int preloaded = 0;
             int skipped = 0;
+            int unsupported = 0;
+            int failed = 0;
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             Debug.Log($"[FileMetadataService] Starting background preload for {filePaths.Count} files");
@@ -1023,6 +1036,10 @@ namespace VRWorkspace.UI.RTT.Services
                         _videoMetadataCache[filePath] = metadata;
                         preloaded++;
                     }
+                    else
+                    {
+                        failed++;
+                    }
                 }
                 else if (isAudio)
                 {
@@ -1040,6 +1057,14 @@ namespace VRWorkspace.UI.RTT.Services
                         _audioMetadataCache[filePath] = metadata;
                         preloaded++;
                     }
+                    else
+                    {
+                        failed++;
+                    }
+                }
+                else
+                {
+                    unsupported++;
                 }
 
                 // Yield every 20 items to keep UI responsive
@@ -1051,7 +1076,7 @@ namespace VRWorkspace.UI.RTT.Services
             _isPreloading = false;
             _preloadCoroutine = null;
 
-            Debug.Log($"[FileMetadataService] Preload complete: {preloaded} loaded, {skipped} cached, {filePaths.Count - preloaded - skipped} failed ({sw.ElapsedMilliseconds}ms)");
+            Debug.Log($"[FileMetadataService] Preload complete: {preloaded} loaded, {skipped} cached, {unsupported} unsupported, {failed} failed ({sw.ElapsedMilliseconds}ms)");
         }
 
         /// <summary>

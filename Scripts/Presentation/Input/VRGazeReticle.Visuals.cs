@@ -163,9 +163,13 @@ namespace VRWorkspace.VRInput
             // Show Recenter UI
             if (_recenterGroup != null)
             {
-                _recenterGroup.SetActive(true);
                 if (icon != null) _recenterIcon.sprite = icon;
                 _recenterRing.fillAmount = 0f;
+                // Apply the recenter canvas scale before enabling its 256x256 visuals.
+                // Otherwise they render for one frame at the normal reticle scale and
+                // appear as a full-screen white flash.
+                UpdateRecenterPosition();
+                _recenterGroup.SetActive(true);
             }
         }
 
@@ -180,8 +184,6 @@ namespace VRWorkspace.VRInput
             _isRecentering = false;
             if (_recenterGroup != null) _recenterGroup.SetActive(false);
 
-            // Reset stabilization after recenter to sync with new orientation
-            ResetStabilization();
         }
 
         void UpdateRecenterPosition()

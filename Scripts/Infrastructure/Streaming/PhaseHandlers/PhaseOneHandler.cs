@@ -123,7 +123,7 @@ namespace VRWorkspace.Streaming
                 $"\"apiLevel\":{clientCap.apiLevel}," +
                 $"\"screenWidth\":{screenWidth}," +
                 $"\"screenHeight\":{screenHeight}" +
-                $"}},\"perTrackPc\":true}}";
+                $"}},\"perTrackPc\":true,\"streamAllMonitors\":true}}";
             await _send(ackJson);
             AppLog.Log("[Phase1] hardware_info_ack sent");
 

@@ -10,6 +10,8 @@ using VRWorkspace.Media.Data;
 using VRWorkspace.Media.UI;
 using VRWorkspace.Media.Utils;
 using VRWorkspace.UI.RTT.Components;
+using VRWorkspace.Presentation.Input.VCS;
+using VRWorkspace.Domain.Input;
 
 namespace VRWorkspace.Presentation.Media.Controllers
 {
@@ -24,6 +26,40 @@ namespace VRWorkspace.Presentation.Media.Controllers
     /// </summary>
     public class MediaPlayerUIBuilder
     {
+        // ------------------------------------------------------------------ //
+        //  [HUB_DBG] Diagnostic helper                                        //
+        // ------------------------------------------------------------------ //
+        /// <summary>
+        /// Logs the EdgePolicy actually registered in VCS for a canvas right after
+        /// ForceInitialize(). Confirms whether its VirtualSurfaceOverride took effect
+        /// (expected Up/Left/Right) or silently fell back to EdgePolicy.All (meaning the
+        /// override wasn't found in time, or wasn't found at all).
+        /// </summary>
+        private static void LogRegisteredEdgePolicy(string label, RTTCanvasBase canvas)
+        {
+            if (canvas == null)
+            {
+                Debug.LogWarning($"[HUB_DBG] {label}: canvas is null, cannot check.");
+                return;
+            }
+
+            var id = RTTCanvasAutoRegistrar.Instance?.TryGetSurfaceId(canvas);
+            if (!id.HasValue)
+            {
+                Debug.LogWarning($"[HUB_DBG] {label}: not yet registered in VCS (TryGetSurfaceId returned null).");
+                return;
+            }
+
+            var vcs = VirtualCursorSpace.Instance;
+            if (vcs == null || !vcs.Surfaces.TryGet(id.Value, out var surface))
+            {
+                Debug.LogWarning($"[HUB_DBG] {label}: surfaceId={id.Value} exists but not found in VCS.Surfaces registry.");
+                return;
+            }
+
+            Debug.Log($"[HUB_DBG] {label}: edges={surface.Edges} priority={surface.Priority} center={surface.Center} size={surface.Size}");
+        }
+
         // ------------------------------------------------------------------ //
         //  Construction parameters                                             //
         // ------------------------------------------------------------------ //
@@ -161,6 +197,49 @@ namespace VRWorkspace.Presentation.Media.Controllers
             var controlsFrame = controlsFrameObj.AddComponent<RTTMenuFrame>();
             result.ControlsCanvasBase = controlsFrame;
 
+            // New hub-and-spoke VCS topology (replaces the old single merged bounding box):
+            // Controls only connects UP into the invisible Hub — its other edges are outer
+            // boundaries with nothing to traverse into, so the cursor clamps there instead of
+            // escaping. Must be added before ForceInitialize() below: RTTCanvasAutoRegistrar
+            // reads this override once, at surface-creation time.
+            // Horizontal (left/right) inset — confirmed correct by direct testing:
+            // 1) Quad vs container: the quad is `expandedWidth` = _containerWidth + 2*padding
+            //    wide (padding = _containerWidth*0.05, for a background glow effect), while
+            //    RTTMediaControlsPanel's own canvas is initialized at _containerWidth — i.e.
+            //    it's centered within the quad with `padding` empty space on each side.
+            // 2) Within that canvas, RTTMediaControlsPanel.BuildUI()'s outer VerticalLayoutGroup
+            //    adds a further 15px hover-effect clearance on each side (hoverMargin).
+            float quadToContainerPadding = _containerWidth * 0.05f; // padding, from expandedWidth above
+            const float controlsHoverMarginPx = 15f;
+            float insetLeftPx = quadToContainerPadding + controlsHoverMarginPx;
+            float insetRightPx = quadToContainerPadding + controlsHoverMarginPx;
+
+            // Vertical (top/bottom) inset — the layout-traced asymmetric guess (100px top from
+            // TOP_SPACER, 0px bottom, reasoning it sits flush with the canvas) turned out
+            // incomplete: testing showed ~10% excess remaining on BOTH top and bottom, meaning
+            // there's at least one more margin source inside RTTMediaControlsPanel's body panel
+            // (candidates: BG_VERTICAL_SPACING_RATIO's internal top/bottom padding, and/or Zone
+            // A's own button padding within its 200px zone) not fully accounted for by tracing
+            // the outer layout.padding alone. Using the reported ~10% directly (symmetric) for
+            // now instead of continuing to guess additional layout constants — tune
+            // controlsVerticalMarginPercent if 10% isn't exactly right after this test.
+            const float controlsVerticalMarginPercent = 0.10f;
+            float insetTopPx = controlsHeight * controlsVerticalMarginPercent;
+            float insetBottomPx = controlsHeight * controlsVerticalMarginPercent;
+
+            var controlsSurfaceOverride = controlsFrameObj.AddComponent<VirtualSurfaceOverride>();
+            controlsSurfaceOverride.Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
+            // Priority SidePanel (>Default) is required, not cosmetic: when a traversal ray's
+            // exit point already lies inside the outer background RTTMenuFrame's bounds (very
+            // likely — that surface is huge), RayBoxIntersect2D reports Distance=0 for it,
+            // which can tie with an adjacent target (e.g. Controls/Queue) also at Distance=0.
+            // TryTraverseEdge breaks such ties by priority, so every mediaPlayer surface must
+            // outrank the background's Default(100) or traversal can land on the background
+            // instead of the intended adjacent surface.
+            controlsSurfaceOverride.ConfigureContentInset(
+                insetLeftPx / density, insetRightPx / density,
+                insetTopPx / density, insetBottomPx / density);
+
             controlsFrame.Configure(physicalWidth, physicalHeight, controlsWidth);
             controlsFrame.SetGlassBackgroundEnabled(false);
             controlsFrame.SetFloatingDataEnabled(false);
@@ -206,6 +285,31 @@ namespace VRWorkspace.Presentation.Media.Controllers
             float sidePhysicalH = sideLogicalHeight / density;
             result.SidePhysicalW = sidePhysicalW;
             result.SidePhysicalH = sidePhysicalH;
+
+            // Queue panel only connects back into the Hub through its edge nearest to
+            // Controls (Left when the panel sits to the right, per sideControlsSide — the
+            // mirrored case flips to Right). All other edges are outer boundaries.
+            // Priority SidePanel (see Controls override above for why) so this surface wins
+            // distance ties against the outer background RTTMenuFrame during traversal.
+            // Also allow Down: Queue's Pagination strip sits directly below it and needs a
+            // route in (see section 3c below, which grants Pagination the matching Up edge).
+            var queueSurfaceOverride = result.SideControlsFrameObject.AddComponent<VirtualSurfaceOverride>();
+            queueSurfaceOverride.Configure(
+                (sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right) | EdgePolicy.Down,
+                SurfacePriority.SidePanel,
+                orthogonalProjection: true);
+
+            // RTTMediaQueuePanel insets its header (title + shuffle button), and separately
+            // its item thumbnails/titles, by SIDE_MARGIN_RATIO=0.055 (5.5%) of _width on each
+            // side (see RTTMediaQueuePanel.cs: `_sideMargin = _width * SIDE_MARGIN_RATIO`,
+            // applied to headerRT/titleRT offsets). To prevent coordinate gaps on the side
+            // adjacent to the Hub (where they should align exactly at the physical boundary),
+            // we dynamically clear the inset on the inner edge (Left when panel is on right,
+            // Right when panel is on left) while preserving it on the outer edge.
+            float queueLeftInset = (sideControlsSide >= 0) ? 0f : (sidePhysicalW * 0.055f);
+            float queueRightInset = (sideControlsSide >= 0) ? (sidePhysicalW * 0.055f) : 0f;
+            queueSurfaceOverride.ConfigureContentInset(queueLeftInset, queueRightInset, 0f, 0f);
+            Debug.Log($"[HUB_DBG] Configured Queue's ContentInset: overrideInstanceId={queueSurfaceOverride.GetEntityId()} onGameObject={result.SideControlsFrameObject.GetEntityId()} ContentInset={queueSurfaceOverride.ContentInset}");
 
             sideFrame.Configure(sidePhysicalW, sidePhysicalH, sideLogicalWidth);
             sideFrame.SetGlassBackgroundEnabled(false);
@@ -261,6 +365,21 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 result.SettingsFrameObject.layer = vLayer;
 
                 var settingsMenuFrame = result.SettingsFrameObject.AddComponent<RTTMenuFrame>();
+
+                // Same rule as Queue — Settings and Queue are mutually exclusive, so whichever
+                // is open connects back into the Hub the same way. Priority SidePanel for the
+                // same tie-breaking reason (see Controls override above).
+                var settingsSurfaceOverride = result.SettingsFrameObject.AddComponent<VirtualSurfaceOverride>();
+                settingsSurfaceOverride.Configure(sideControlsSide >= 0 ? EdgePolicy.Left : EdgePolicy.Right, SurfacePriority.SidePanel, orthogonalProjection: true);
+
+                // RTTMediaSettingsPanel uses the identical SIDE_MARGIN_RATIO=0.055 (5.5%)
+                // left/right content inset as Queue (same constant, confirmed in
+                // RTTMediaSettingsPanel.cs). Clear the inset on the inner edge adjacent
+                // to the Hub to align physical boundaries exactly.
+                float settingsLeftInset = (sideControlsSide >= 0) ? (settingsPhysicalW * 0.055f) : 0f;
+                float settingsRightInset = (sideControlsSide >= 0) ? 0f : (settingsPhysicalW * 0.055f);
+                settingsSurfaceOverride.ConfigureContentInset(settingsLeftInset, settingsRightInset, 0f, 0f);
+
                 settingsMenuFrame.Configure(settingsPhysicalW, settingsTotalH, settingsLogicalW);
                 settingsMenuFrame.SetGlassBackgroundEnabled(false);
                 settingsMenuFrame.SetFloatingDataEnabled(false);
@@ -306,6 +425,30 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 float queuePixelW = sidePhysicalW / paginationPixelToMeter;
                 float btnSize = Mathf.Round(Mathf.Clamp(queuePixelW * 0.16f, 50f, 90f));
                 float paginationFrameW = queuePixelW + 2f * btnSize;
+
+                // Pagination only connects back up into Queue. Priority SidePanel (see
+                // Controls override above) so it also wins distance ties against the outer
+                // background RTTMenuFrame.
+                //
+                // NOTE: Pagination's display quad is intentionally wider than Queue
+                // (paginationFrameW = queuePixelW + 2*btnSize, for the prev/next arrow
+                // buttons) — a previous attempt shrank Pagination's REGISTERED VCS size down
+                // to Queue's width via ContentInset to close that gap, but that introduced a
+                // worse regression (cursor jumping left by half of Queue's width when crossing
+                // Queue -> Pagination) and doesn't match how Library handles the analogous
+                // Pagination/Taskbar size relationship (no special override there either).
+                // Registering Pagination at its true, wider size instead.
+                var paginationSurfaceOverride = paginationObj.AddComponent<VirtualSurfaceOverride>();
+                paginationSurfaceOverride.Configure(EdgePolicy.Up, SurfacePriority.SidePanel, orthogonalProjection: true);
+                // Shrink Pagination's registered VCS width using ContentInset so that its
+                // VCS bounds match Queue's visual bounds exactly (since Pagination has extra
+                // width on the sides for the prev/next arrow buttons). Now that both Queue
+                // and Pagination align at the exact same physical X coordinates, there is
+                // no horizontal jump when transitioning, and Pagination does not overlap
+                // with the Controls/Hub.
+                float paginationInsetMeters = btnSize * paginationPixelToMeter;
+                paginationSurfaceOverride.ConfigureContentInset(paginationInsetMeters, paginationInsetMeters, 0f, 0f);
+
                 result.QueuePagination.Initialize((IPaginationController)result.QueuePanel, paginationFrameW, 3);
 
                 result.QueuePagination.SetGlassColors(
@@ -405,13 +548,97 @@ namespace VRWorkspace.Presentation.Media.Controllers
                 btnCol.size = new Vector3(menuBtnPixels, menuBtnPixels, 10);
                 btnCol.center = new Vector3(0, 0, -5);
             }
+
+            // Phase 6: Auto-hide timer for the Gaze-mode wake-up button. The button
+            // shrinks-to-disappear after 10s of no gaze activity, then fades back in
+            // when the user's gaze enters the 2m collider area, and fades out again
+            // once the gaze leaves. See MenuButtonAutoHideTimer for the policy.
+            var cam = Camera.main;
+            if (cam != null)
+            {
+                VRWorkspace.Presentation.Media.Controllers.MenuButtonAutoHideTimer.AttachTo(
+                    result.MenuButtonFrameObject, cam);
+            }
             result.MenuButtonFrameObject.SetActive(false);
+
+            // ====================================================== //
+            // 4b. Invisible Hub surface (video display area)         //
+            //      Controls --Up--> Hub --Right--> Queue/Settings    //
+            //                                                          //
+            // NOTE: this replaces the old single merged "controls +   //
+            // side + settings" bounding-box surface (formerly         //
+            // MediaPlayerSurfaceController). That legacy surface is   //
+            // intentionally no longer registered here: it was a       //
+            // single axis-aligned rectangle spanning from Controls'   //
+            // bottom-left all the way to the side panel's top-right,  //
+            // which necessarily included empty "dead space" (e.g.     //
+            // above Controls and left of the side panel) that isn't   //
+            // part of any real UI element. Because that surface also  //
+            // registered at SurfacePriority.SidePanel (higher than    //
+            // the Standard priority used by Controls/Hub/Queue/       //
+            // Settings), the cursor kept getting snapped/re-homed     //
+            // onto it and could then freely roam that dead space —    //
+            // i.e. escape the intended staircase-shaped bounds. The   //
+            // Hub + Controls + Queue/Settings trio below is the only  //
+            // geometry that should ever be registered for cursor      //
+            // bounds now; do not re-add the old union surface.        //
+            // ====================================================== //
+            result.HubSurfaceController = MediaPlayerHubSurfaceController.Attach(
+                result.PlayerControlsGroup,
+                result.ControlsCanvasBase,
+                result.SideControlsFrameObject.GetComponent<RTTMenuFrame>(),
+                result.SettingsFrameObject.GetComponent<RTTMenuFrame>(),
+                sideControlsSide);
+
+            // [HUB_DBG] Verify each VirtualSurfaceOverride actually took effect — i.e. VCS
+            // registered the canvas with the overridden EdgePolicy (Up/Left/Right), not the
+            // EdgePolicy.All default RTTCanvasAutoRegistrar falls back to when it finds no
+            // override. Search logcat for "[HUB_DBG]" after opening the player once.
+            LogRegisteredEdgePolicy("Controls", result.ControlsCanvasBase);
+            LogRegisteredEdgePolicy("Queue", result.SideControlsFrameObject.GetComponent<RTTMenuFrame>());
+            LogRegisteredEdgePolicy("Settings", result.SettingsFrameObject.GetComponent<RTTMenuFrame>());
+
+            // [HUB_DBG] Visual wireframe of the ACTUAL registered VCS bounds — see
+            // VcsDebugBoundsVisualizer for why this exists. Toggle VcsDebugBoundsVisualizer.
+            // Enabled = false to turn it off. Colors: Hub=yellow, Controls=red, Queue=green,
+            // Settings=cyan, Pagination=magenta.
+            {
+                var registrar = RTTCanvasAutoRegistrar.Instance;
+                var refT = RTTMenuFrame.PrimaryInstance != null ? RTTMenuFrame.PrimaryInstance.transform : null;
+                var queueId = registrar?.TryGetSurfaceId(result.SideControlsFrameObject.GetComponent<RTTMenuFrame>());
+                var settingsId = registrar?.TryGetSurfaceId(result.SettingsFrameObject.GetComponent<RTTMenuFrame>());
+                var paginationId = result.QueuePagination != null ? registrar?.TryGetSurfaceId(result.QueuePagination) : null;
+
+                var tracked = new List<(string, Guid, Color)>();
+                if (result.HubSurfaceController != null)
+                    tracked.Add(("Hub", result.HubSurfaceController.SurfaceId, Color.yellow));
+                var controlsId = registrar?.TryGetSurfaceId(result.ControlsCanvasBase);
+                if (controlsId.HasValue) tracked.Add(("Controls", controlsId.Value, Color.red));
+                if (queueId.HasValue) tracked.Add(("Queue", queueId.Value, Color.green));
+                if (settingsId.HasValue) tracked.Add(("Settings", settingsId.Value, Color.cyan));
+                if (paginationId.HasValue) tracked.Add(("Pagination", paginationId.Value, Color.magenta));
+
+                if (refT != null && tracked.Count > 0)
+                {
+                    VcsDebugBoundsVisualizer.Attach(
+                        result.PlayerControlsGroup, refT, result.ControlsCanvasBase, tracked.ToArray());
+                }
+            }
+
+            // ====================================================== //
+            // 4c. Auto-hide timer (Phase 4) — countdown when cursor  //
+            //     is stationary in empty area between controls/side  //
+            // ====================================================== //
+            result.AutoHideTimer = VRWorkspace.Presentation.Input.Cursor.MediaPlayerAutoHideTimer.Attach(
+                result.PlayerControlsGroup,
+                result.HubSurfaceController,
+                result.ControlsPanel);
 
             // ====================================================== //
             // 5. Error Dialog                                         //
             // ====================================================== //
             var errorDialogObj = new GameObject("MediaErrorDialog");
-            errorDialogObj.transform.SetParent(_libraryContainer, false);
+            errorDialogObj.transform.SetParent(controlsContent, false);
 
             var errorDialogRT = errorDialogObj.AddComponent<RectTransform>();
             errorDialogRT.anchorMin = Vector2.zero;
@@ -421,7 +648,6 @@ namespace VRWorkspace.Presentation.Media.Controllers
 
             result.ErrorDialog = errorDialogObj.AddComponent<MediaErrorDialog>();
             result.ErrorDialog.Initialize(_font, _primaryColor, _accentColor);
-            errorDialogObj.SetActive(false); // Start hidden; Show() will activate it
 
             // ====================================================== //
             // 6. Projection & Environment popups                      //
@@ -858,6 +1084,12 @@ namespace VRWorkspace.Presentation.Media.Controllers
         public Button BlockerButton;
         public GameObject UISettingsPopupFrame;
         public RTTMediaUISettingsPopup UISettingsPopup;
+
+        // VCS surface for cursor bounds (Phase 1)
+        public MediaPlayerHubSurfaceController HubSurfaceController;
+
+        // Auto-hide timer (Phase 4)
+        public VRWorkspace.Presentation.Input.Cursor.MediaPlayerAutoHideTimer AutoHideTimer;
 
         // Layout metrics needed by VRMediaAppController for positioning
         public float SideControlsBaseX;

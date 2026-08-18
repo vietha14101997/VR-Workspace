@@ -37,43 +37,6 @@ namespace VRWorkspace.VRInput
         [Tooltip("Bật/tắt tính năng Dwell Click")]
         public bool dwellClickEnabled = true;
 
-        [Header("Head Stabilization")]
-        [Tooltip("Bật/tắt tính năng ổn định đầu (giảm rung lắc)")]
-        public bool headStabilizationEnabled = true;
-
-        [Tooltip("Hệ số smoothing khi đứng yên (thấp = ít noise hơn, camera ổn định hơn)")]
-        [Range(0.01f, 0.15f)]
-        public float stillSmoothingFactor = 0.05f;
-
-        [Tooltip("Hệ số smoothing khi quay đầu (cao = responsive hơn)")]
-        [Range(0.5f, 0.99f)]
-        public float movingSmoothingFactor = 0.90f;
-
-        [Tooltip("Ngưỡng vận tốc góc (độ/giây) coi là 'đứng yên'")]
-        [Range(0.5f, 10f)]
-        public float stillThreshold = 1.5f;
-
-        [Tooltip("Ngưỡng vận tốc góc (độ/giây) coi là 'quay nhanh'")]
-        [Range(10f, 60f)]
-        public float fastThreshold = 25f;
-
-        [Header("Dead Zone")]
-        [Tooltip("Ngưỡng dead zone (độ/giây) - chuyển động dưới mức này bị bỏ qua hoàn toàn")]
-        [Range(0.1f, 3f)]
-        public float deadZoneThreshold = 0.8f;
-
-        [Header("Compass Yaw Correction")]
-        [Tooltip("Bật/tắt chỉnh yaw drift bằng compass (cần thiết vì Cardboard XR không dùng compass)")]
-        public bool compassCorrectionEnabled = true;
-
-        [Tooltip("Cường độ chỉnh yaw theo compass (thấp = mượt hơn, ít giật)")]
-        [Range(0.005f, 0.1f)]
-        public float compassCorrectionStrength = 0.02f;
-
-        [Tooltip("Hệ số lọc low-pass cho compass heading (thấp = lọc mạnh, ít nhiễu)")]
-        [Range(0.005f, 0.1f)]
-        public float compassFilterAlpha = 0.02f;
-
         private Image _reticleImage;
         private Camera _cam;
         private RectTransform _canvasRT;
@@ -118,23 +81,19 @@ namespace VRWorkspace.VRInput
         private float _lastRTTClickTime;
         private const float kRTTClickCooldown = 0.3f;
 
-        // Head Stabilization State
-        private Quaternion _stabilizedRotation;
-        private Vector3 _previousEuler;
-        private float _currentSmoothingFactor;
-        private bool _stabilizationInitialized = false;
-
-        // Dead zone lock state
-        private Quaternion _lockedRotation;
-        private bool _isLocked = false;
-
-        // Compass yaw correction state
-        private bool _compassInitialized = false;
-        private float _filteredCompassHeading = 0f;
-        private float _compassYawOffset = 0f;
-
         // Singleton access helper (optional, or use FindObjectOfType)
         public static VRGazeReticle Instance { get; private set; }
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, Instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            Instance = null;
+        }
 
         void Awake()
         {
@@ -162,18 +121,15 @@ namespace VRWorkspace.VRInput
             _pointerData = new PointerEventData(EventSystem.current);
             _lastGazeDirection = _cam.transform.forward;
 
-            // Initialize head stabilization (dead zone + smoothing + compass yaw correction)
-            InitializeStabilization();
-
-            // Bật compass cho yaw correction (Cardboard XR không dùng compass nên yaw sẽ drift nếu thiếu)
-            if (compassCorrectionEnabled)
-            {
-                Input.compass.enabled = true;
-            }
         }
 
         void Update()
         {
+            if (_canvasRT != null && !_canvasRT.gameObject.activeSelf)
+            {
+                return;
+            }
+
             if (_isRecentering)
             {
                 UpdateRecenterPosition();
@@ -1260,167 +1216,16 @@ namespace VRWorkspace.VRInput
             _lastClickedButton = obj;
         }
 
-        #region Head Stabilization
-
         /// <summary>
-        /// Approach: Trust Cardboard XR (TrackedPoseDriver) for base rotation.
-        /// Add only: Dead Zone + Adaptive Smoothing + Compass Yaw Correction.
-        /// Compass is needed because Cardboard XR does NOT use magnetometer,
-        /// so yaw will drift over time without an absolute reference.
+        /// Show or hide the entire gaze reticle canvas.
         /// </summary>
-        void InitializeStabilization()
+        public void SetReticleVisible(bool visible)
         {
-            if (_cam != null && headStabilizationEnabled)
+            if (_canvasRT != null)
             {
-                _stabilizedRotation = _cam.transform.rotation;
-                _lockedRotation = _stabilizedRotation;
-                _previousEuler = _cam.transform.eulerAngles;
-                _currentSmoothingFactor = stillSmoothingFactor;
-                _isLocked = false;
-                _stabilizationInitialized = true;
+                _canvasRT.gameObject.SetActive(visible);
             }
         }
-
-        void LateUpdate()
-        {
-            if (headStabilizationEnabled && _stabilizationInitialized && !_isRecentering)
-            {
-                ApplyHeadStabilization();
-            }
-        }
-
-        void ApplyHeadStabilization()
-        {
-            if (_cam == null) return;
-
-            float dt = Time.deltaTime;
-            if (dt <= 0f) return;
-
-            // Cardboard XR (TrackedPoseDriver) đã set rotation trước LateUpdate
-            Quaternion rawRotation = _cam.transform.rotation;
-            Vector3 currentEuler = rawRotation.eulerAngles;
-            Vector3 deltaEuler = DeltaAngles(_previousEuler, currentEuler);
-            float angularSpeed = deltaEuler.magnitude / dt;
-
-            // === DEAD ZONE: dưới ngưỡng → khóa camera hoàn toàn ===
-            if (angularSpeed < deadZoneThreshold)
-            {
-                if (!_isLocked)
-                {
-                    _lockedRotation = _stabilizedRotation;
-                    _isLocked = true;
-                }
-
-                // Khi đứng yên, vẫn áp dụng compass correction nhẹ để sửa drift tích lũy
-                if (compassCorrectionEnabled)
-                {
-                    ApplyCompassYawCorrection(ref _lockedRotation, dt);
-                }
-
-                _cam.transform.rotation = _lockedRotation;
-            }
-            else
-            {
-                // Trên ngưỡng dead zone → user đang quay đầu thật
-                _isLocked = false;
-
-                _currentSmoothingFactor = CalculateAdaptiveSmoothingFactor(angularSpeed);
-                _stabilizedRotation = Quaternion.Slerp(_stabilizedRotation, rawRotation, _currentSmoothingFactor);
-
-                // Compass correction khi di chuyển (nhẹ hơn)
-                if (compassCorrectionEnabled)
-                {
-                    ApplyCompassYawCorrection(ref _stabilizedRotation, dt);
-                }
-
-                _cam.transform.rotation = _stabilizedRotation;
-            }
-
-            _previousEuler = currentEuler;
-        }
-
-        /// <summary>
-        /// Sửa yaw drift bằng compass. Cardboard XR không dùng magnetometer
-        /// nên yaw sẽ trôi dần theo thời gian — compass là tham chiếu tuyệt đối duy nhất cho yaw.
-        /// </summary>
-        void ApplyCompassYawCorrection(ref Quaternion rotation, float dt)
-        {
-            // Chỉ dùng compass khi dữ liệu đáng tin cậy
-            // headingAccuracy < 0 = invalid, > 45° = quá nhiễu
-            if (Input.compass.headingAccuracy < 0f || Input.compass.headingAccuracy > 45f)
-                return;
-
-            float compassHeading = Input.compass.trueHeading;
-
-            if (!_compassInitialized)
-            {
-                _filteredCompassHeading = compassHeading;
-                _compassYawOffset = Mathf.DeltaAngle(compassHeading, rotation.eulerAngles.y);
-                _compassInitialized = true;
-                return;
-            }
-
-            // Low-pass filter compass (circular) để giảm nhiễu
-            float headingDelta = Mathf.DeltaAngle(_filteredCompassHeading, compassHeading);
-            _filteredCompassHeading += headingDelta * compassFilterAlpha;
-            _filteredCompassHeading = (_filteredCompassHeading % 360f + 360f) % 360f;
-
-            // Yaw kỳ vọng theo compass
-            float expectedYaw = (_filteredCompassHeading + _compassYawOffset) % 360f;
-            if (expectedYaw < 0f) expectedYaw += 360f;
-
-            // Sai lệch giữa camera hiện tại và compass
-            float yawError = Mathf.DeltaAngle(rotation.eulerAngles.y, expectedYaw);
-
-            // Nếu sai lệch > 20° → user đã quay vật lý, re-sync offset
-            if (Mathf.Abs(yawError) > 20f)
-            {
-                _compassYawOffset = Mathf.DeltaAngle(_filteredCompassHeading, rotation.eulerAngles.y);
-                return;
-            }
-
-            // Chỉnh yaw từ từ, tránh giật
-            float correction = yawError * compassCorrectionStrength * dt;
-            rotation = Quaternion.AngleAxis(correction, Vector3.up) * rotation;
-        }
-
-        float CalculateAdaptiveSmoothingFactor(float angularSpeed)
-        {
-            if (angularSpeed >= fastThreshold)
-                return movingSmoothingFactor;
-            if (angularSpeed <= stillThreshold)
-                return stillSmoothingFactor;
-
-            float t = (angularSpeed - stillThreshold) / (fastThreshold - stillThreshold);
-            t = t * t * (3f - 2f * t); // SmoothStep
-            return Mathf.Lerp(stillSmoothingFactor, movingSmoothingFactor, t);
-        }
-
-        Vector3 DeltaAngles(Vector3 from, Vector3 to)
-        {
-            return new Vector3(
-                Mathf.DeltaAngle(from.x, to.x),
-                Mathf.DeltaAngle(from.y, to.y),
-                Mathf.DeltaAngle(from.z, to.z)
-            );
-        }
-
-        /// <summary>
-        /// Reset stabilization state. Call this after recentering.
-        /// </summary>
-        public void ResetStabilization()
-        {
-            if (_cam != null)
-            {
-                _stabilizedRotation = _cam.transform.rotation;
-                _lockedRotation = _stabilizedRotation;
-                _previousEuler = _cam.transform.eulerAngles;
-                _isLocked = false;
-                _compassInitialized = false;
-            }
-        }
-
-        #endregion
 
     }
 

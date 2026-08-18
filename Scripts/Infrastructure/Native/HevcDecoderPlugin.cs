@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace VRWorkspace.Native
 {
@@ -22,17 +23,269 @@ namespace VRWorkspace.Native
 #if UNITY_ANDROID && !UNITY_EDITOR
         private AndroidJavaObject _decoderBridge;
         private static AndroidJavaClass _bridgeClass;
-        
+
         // Cached JNI method IDs to avoid AndroidJNIHelper.GetSignature warnings
         private IntPtr _decodeMethodId = IntPtr.Zero;
+        // Instance method on _decoderBridge: boolean pushEncodedFrame(byte[], long, boolean)
+        // Used only by the byte-buffer / legacy path (instance mNativeHandle != 0).
         private IntPtr _pushFrameMethodId = IntPtr.Zero;
         private IntPtr _bridgeRawObject = IntPtr.Zero;
+
+        // Static method (J[BJZ)Z on the HevcDecoderBridge class — Plan C surface
+        // mode passes the decoder handle explicitly so we don't depend on the
+        // Java instance's mNativeHandle (which createWithExternalTexture, being
+        // static, never sets).
+        private static IntPtr sBridgeClassRef = IntPtr.Zero;
+        private static IntPtr sPushFrameStaticId = IntPtr.Zero;
+
+        // Unity native plugin entrypoints — in libvrworkspace_oes_plugin.so which
+        // Unity loads as a Unity native plugin from
+// Assets/Plugins/Android/libs/<arch>/. UnityPluginLoad is called by Unity
+// during plugin initialization, and GL.IssuePluginEvent dispatches
+// callbacks to the registered render event handler.
+//
+// libhevc_decoder.so (the AAR's JNI library) and libvrworkspace_oes_plugin.so
+// are two different libraries; we keep them separate so the Unity plugin
+// path is fully isolated from the Java JNI path.
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "GetOesTextureEventCallback")]
+        private static extern System.IntPtr NativeGetOesEventCallbackPtr();
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "SetOesPendingAlloc")]
+        private static extern void NativeSetOesPendingAlloc(int width, int height);
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "SetOesPendingFree")]
+        private static extern void NativeSetOesPendingFree(int oesId, int tex2dId);
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "GetOesResultHandle")]
+        private static extern int NativeGetOesResultHandle();
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "GetOesTex2dResultHandle")]
+        private static extern int NativeGetOesTex2dResultHandle();
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "GetOesRequestPending")]
+        private static extern int NativeGetOesRequestPending();
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "SetOesBlitParams")]
+        private static extern void NativeSetOesBlitParams(int srcOesId, int dstTex2dId, int width, int height);
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "SetJavaVM")]
+        private static extern void NativeSetJavaVM(System.IntPtr javaVM);
+
+        [System.Runtime.InteropServices.DllImport("vrworkspace_oes_plugin",
+            EntryPoint = "PreloadOesPlugin")]
+        private static extern void NativePreloadOesPlugin();
+
+        // Function pointer for GL.IssuePluginEvent / CommandBuffer.IssuePluginEvent.
+        private static System.IntPtr s_OesEventCallbackPtr = System.IntPtr.Zero;
+        private static readonly object s_OesCallbackLock = new object();
+
+        private static void PreloadPluginOnMainThread()
+        {
+            try
+            {
+                NativePreloadOesPlugin();
+#if UNITY_ANDROID && !UNITY_EDITOR
+                System.IntPtr jvm = UnityEngine.AndroidJNI.GetJavaVM();
+                if (jvm != System.IntPtr.Zero)
+                {
+                    NativeSetJavaVM(jvm);
+                }
+#endif
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"{TAG} PreloadOesPlugin warning: {ex.Message}");
+            }
+        }
+
+        private static System.IntPtr GetOesEventCallbackPtr()
+        {
+            PreloadPluginOnMainThread();
+            if (s_OesEventCallbackPtr != System.IntPtr.Zero) return s_OesEventCallbackPtr;
+            lock (s_OesCallbackLock)
+            {
+                if (s_OesEventCallbackPtr != System.IntPtr.Zero) return s_OesEventCallbackPtr;
+                s_OesEventCallbackPtr = NativeGetOesEventCallbackPtr();
+                if (s_OesEventCallbackPtr == System.IntPtr.Zero)
+                {
+                    Debug.LogError($"{TAG} OES plugin callback pointer is NULL " +
+                                   "(libvrworkspace_oes_plugin.so may not be loaded)");
+                }
+                else
+                {
+                    Debug.Log($"{TAG} OES plugin callback ptr=0x{s_OesEventCallbackPtr.ToInt64():X} (raw native)");
+                }
+            }
+            return s_OesEventCallbackPtr;
+        }
+
+        /// <summary>
+        /// Issue the native OES+2D allocation callback on Unity's render thread.
+        /// Returns (oesId, tex2dId) where oesId is GL_TEXTURE_EXTERNAL_OES (for Java)
+        /// and tex2dId is GL_TEXTURE_2D (for Unity sampler2D). Both are 0 on failure.
+        ///
+        /// BUGFIX: previous implementation used spin=2500 with Thread.Sleep(0) which
+        /// gives only ~2500 yields (~80-100ms on Quest 3). When the render thread was
+        /// busy rendering a previous frame (e.g. right after App start), the OES allocation
+        /// callback was queued but the spin-wait timed out before render thread processed
+        /// it. Result: decoder init failed and decoder never recovered until external
+        /// retry (~7 seconds later in the observed log).
+        ///
+        /// Fix: triple the spin budget (~5 seconds) AND retry automatically on timeout.
+        /// The retry happens with a longer sleep so the render thread has time to drain
+        /// any pending frames before the next attempt.
+        /// </summary>
+        private static (int oesId, int tex2dId) AllocateOesTextureRenderThread(int width, int height)
+        {
+            System.IntPtr callbackPtr = GetOesEventCallbackPtr();
+            if (callbackPtr == System.IntPtr.Zero)
+            {
+                Debug.LogError($"{TAG} AllocateOesTexture: callback ptr is NULL (libvrworkspace_oes_plugin.so not loaded)");
+                return (0, 0);
+            }
+
+            // BUGFIX: up to 2 retry attempts. Render thread can be blocked by initial scene
+            // load or app-startup work; giving it one extra chance with a 200ms backoff
+            // resolves the "render thread timed out" failure reliably.
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                var result = TryAllocateOesTextureOnce(callbackPtr, width, height, attempt, maxAttempts);
+                if (result.oesId != 0 || result.tex2dId != 0)
+                    return result;
+
+                // On timeout, sleep briefly to let render thread drain pending work.
+                if (attempt < maxAttempts)
+                {
+                    Debug.LogWarning($"{TAG} AllocateOesTexture: attempt {attempt}/{maxAttempts} failed, retrying in 200ms");
+                    System.Threading.Thread.Sleep(200);
+                }
+            }
+            return (0, 0);
+        }
+
+        /// <summary>
+        /// Single attempt to allocate OES texture. Returns (0, 0) on failure (timeout or null handle).
+        /// </summary>
+        private static (int oesId, int tex2dId) TryAllocateOesTextureOnce(
+            System.IntPtr callbackPtr, int width, int height, int attempt, int maxAttempts)
+        {
+            // BUGFIX: spin budget bumped from 2500 → 10000 (~5 seconds at ~0.5ms per spin).
+            // Render thread can take 100-500ms during scene load; previous budget timed out.
+            const int spinBudget = 10000;
+
+            // Write pending request parameters into C++ native memory
+            NativeSetOesPendingAlloc(width, height);
+
+            // CommandBuffer runs on the render thread within Unity's render pipeline.
+            var cb = new CommandBuffer { name = "VRW_OES_Alloc" };
+            cb.IssuePluginEvent(callbackPtr, 1);
+            Graphics.ExecuteCommandBuffer(cb);
+            cb.Release();
+            GL.Flush();
+
+            // Spin-wait checking C++ native state (g_RequestPending)
+            int spin = 0;
+            while (NativeGetOesRequestPending() != 0 && spin < spinBudget)
+            {
+                System.Threading.Thread.Sleep(0);
+                spin++;
+            }
+
+            int reqState = NativeGetOesRequestPending();
+            if (reqState != 0)
+            {
+                Debug.LogError($"{TAG} AllocateOesTexture: render thread timed out " +
+                               $"(ptr=0x{callbackPtr.ToInt64():X}, request={reqState}, attempt={attempt}/{maxAttempts})");
+                return (0, 0);
+            }
+
+            int oesId = NativeGetOesResultHandle();
+            int tex2dId = NativeGetOesTex2dResultHandle();
+            if (oesId == 0 || tex2dId == 0)
+            {
+                Debug.LogError($"{TAG} AllocateOesTexture: allocation failed (oesId={oesId}, tex2dId={tex2dId}, attempt={attempt}/{maxAttempts})");
+                return (0, 0);
+            }
+            Debug.Log($"{TAG} AllocateOesTexture: OES={oesId} + 2D={tex2dId} for {width}x{height}");
+            return (oesId, tex2dId);
+        }
+
+        // Free an OES+2D texture pair allocated above. Synchronous: blocks
+        // until the render-thread callback completes.
+        private static void FreeOesTextureRenderThread(int oesId, int tex2dId)
+        {
+            if (oesId == 0 && tex2dId == 0) return;
+            System.IntPtr callbackPtr = GetOesEventCallbackPtr();
+            if (callbackPtr == System.IntPtr.Zero) return;
+
+            NativeSetOesPendingFree(oesId, tex2dId);
+
+            var cb = new CommandBuffer { name = "VRW_OES_Free" };
+            cb.IssuePluginEvent(callbackPtr, 2);
+            Graphics.ExecuteCommandBuffer(cb);
+            cb.Release();
+            GL.Flush();
+
+            int spin = 0;
+            while (NativeGetOesRequestPending() != 0 && spin < 2500)
+            {
+                System.Threading.Thread.Sleep(0);
+                spin++;
+            }
+            if (NativeGetOesRequestPending() != 0)
+            {
+                Debug.LogWarning($"{TAG} FreeOesTexture: render thread timed out");
+            }
+        }
+
+        /// <summary>
+        /// Issue a GPU blit from OES texture to 2D texture on the render thread.
+        /// Non-blocking: the blit executes before scene rendering in the same frame.
+        /// </summary>
+        private void BlitOesToTex2d()
+        {
+            if (_surfaceModeOesTexId == 0 || _surfaceModeTex2dId == 0) return;
+            System.IntPtr callbackPtr = GetOesEventCallbackPtr();
+            if (callbackPtr == System.IntPtr.Zero) return;
+
+            NativeSetOesBlitParams(_surfaceModeOesTexId, _surfaceModeTex2dId, _width, _height);
+
+            var cb = new CommandBuffer { name = "VRW_OES_Blit" };
+            cb.IssuePluginEvent(callbackPtr, 3);  // EVT_BLIT_OES
+            Graphics.ExecuteCommandBuffer(cb);
+            cb.Release();
+        }
 #endif
 
         private bool _initialized;
+        private bool _isSurfaceMode; // True iff initialized via InitializeWithSurface
         private bool _disposed;
         private int _width;
         private int _height;
+
+        // Plan C (direct-surface mode): handle returned by Java SurfaceBinder +
+        // createWithExternalTexture. Stored here so Dispose can release it via
+        // releaseDirectSurface(handle) which atomically tears down the Java
+        // Surface too. Set to 0 when inactive. Each receiver instance has its own.
+        private long _surfaceModeHandle;
+        // Plan C: GL handle of the GL_TEXTURE_EXTERNAL_OES texture given to
+        // Java SurfaceTexture — MediaCodec writes decoded frames here.
+        private int _surfaceModeOesTexId;
+        // Plan C: GL handle of the GL_TEXTURE_2D texture — Unity's sampler2D
+        // reads from here. Updated each frame via GPU blit from OES.
+        private int _surfaceModeTex2dId;
+        // Plan C: the external-wrapped Unity Texture2D (wrapping _surfaceModeTex2dId)
+        // that the panel material binds.
+        private Texture2D _surfaceModeTexture;
 
         // Frame data cached from native
         private byte[] _yPlaneBuffer;
@@ -141,6 +394,82 @@ namespace VRWorkspace.Native
         }
 
         /// <summary>
+        /// Initialize the decoder in Surface (zero-copy) mode. The native plugin
+        /// will configure MediaCodec to render decoded frames directly into the
+        /// supplied Android Surface, which is backed by the texture backing your
+        /// <see cref="SurfaceTextureBridge"/>.
+        ///
+        /// <para>This eliminates the Texture2D.Apply async-upload race and the
+        /// 5-stage GPU pipeline (Blit + SharpMipGenerator etc.) that caused the
+        /// "đè trùng" artifact on tab switches.</para>
+        /// </summary>
+        /// <param name="width">Video width</param>
+        /// <param name="height">Video height</param>
+        /// <param name="isH264">true for H.264/AVC, false for H.265/HEVC</param>
+        /// <param name="androidSurface">Android Surface obtained from a SurfaceTexture</param>
+        /// <returns>True if initialization successful</returns>
+        public bool InitializeWithSurface(int width, int height, bool isH264, AndroidJavaObject androidSurface)
+        {
+            if (_disposed)
+            {
+                Debug.LogError($"{TAG} Cannot initialize disposed decoder");
+                return false;
+            }
+            if (androidSurface == null)
+            {
+                Debug.LogError($"{TAG} androidSurface is null");
+                return false;
+            }
+
+            if (_initialized)
+            {
+                Debug.LogWarning($"{TAG} Already initialized, releasing first");
+                ReleaseDecoder(true);
+            }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                _decoderBridge = new AndroidJavaObject("com.vrworkspace.hevc.HevcDecoderBridge");
+                bool result = _decoderBridge.Call<bool>(
+                    "initializeWithSurface", width, height, isH264, androidSurface);
+
+                if (!result)
+                {
+                    Debug.LogError($"{TAG} Native initializeWithSurface failed");
+                    _decoderBridge?.Dispose();
+                    _decoderBridge = null;
+                    return false;
+                }
+
+                _width = width;
+                _height = height;
+                _initialized = true;
+                _isSurfaceMode = true;
+
+                // No byte buffers needed in surface mode — the texture behind the
+                // SurfaceTexture is updated directly by MediaCodec.
+                _yPlaneBuffer = null;
+                _uvPlaneBuffer = null;
+
+                Debug.Log($"{TAG} Initialized {width}x{height} (SURFACE zero-copy mode)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"{TAG} InitializeWithSurface exception: {ex.Message}");
+                return false;
+            }
+#else
+            Debug.LogWarning($"{TAG} Surface mode only available on Android");
+            return false;
+#endif
+        }
+
+        /// <summary>True iff this decoder was initialized in Surface (zero-copy) mode.</summary>
+        public bool IsSurfaceMode => _isSurfaceMode;
+
+        /// <summary>
         /// Decode a NAL unit.
         /// </summary>
         /// <param name="nalData">NAL unit data including start code (0x00000001)</param>
@@ -214,26 +543,50 @@ namespace VRWorkspace.Native
 #if UNITY_ANDROID && !UNITY_EDITOR
             lock (_lock)
             {
-                if (!_initialized || _disposed || _decoderBridge == null) return false;
+                if (!_initialized || _disposed) return false;
                 try
                 {
                     EnsureJniMethodIds();
-                    
-                    // Use raw JNI to avoid AndroidJNIHelper.GetSignature byte/sbyte warnings
+
                     sbyte[] signedNalData = (sbyte[])(Array)nalData;
                     IntPtr jByteArray = AndroidJNI.ToSByteArray(signedNalData);
                     try
                     {
+                        // Plan C (direct surface mode) was started via the static
+                        // createWithExternalTexture(...) entry point — that path
+                        // doesn't touch the Java instance's mNativeHandle, so the
+                        // instance method pushEncodedFrame([BJZ)Z would return false
+                        // immediately. Route surface-mode pushes through the
+                        // dedicated static overload (J[BJZ)Z keyed on the native
+                        // handle we already stored in _surfaceModeHandle.
+                        if (_surfaceModeHandle != 0L && sPushFrameStaticId != IntPtr.Zero)
+                        {
+                            jvalue[] staticArgs = new jvalue[4];
+                            staticArgs[0].j = _surfaceModeHandle;
+                            staticArgs[1].l = jByteArray;
+                            staticArgs[2].j = timestamp;
+                            staticArgs[3].z = isKeyFrame;
+                            bool result = AndroidJNI.CallStaticBooleanMethod(
+                                sBridgeClassRef, sPushFrameStaticId, staticArgs);
+                            if (!result && EncodedFramePushFailureShouldLog(isKeyFrame))
+                            {
+                                Debug.LogWarning($"{TAG} Failed to push {(isKeyFrame ? "IDR" : "P")} frame to surface-mode decoder (buffer full or hardware busy)");
+                            }
+                            return result;
+                        }
+
+                        // Legacy / byte-buffer mode: instance method, instance mNativeHandle.
+                        if (_decoderBridge == null || _pushFrameMethodId == IntPtr.Zero) return false;
                         jvalue[] args = new jvalue[3];
                         args[0].l = jByteArray;
                         args[1].j = timestamp;
                         args[2].z = isKeyFrame;
-                        bool result = AndroidJNI.CallBooleanMethod(_bridgeRawObject, _pushFrameMethodId, args);
-                        if (!result)
+                        bool instResult = AndroidJNI.CallBooleanMethod(_bridgeRawObject, _pushFrameMethodId, args);
+                        if (!instResult && EncodedFramePushFailureShouldLog(isKeyFrame))
                         {
                             Debug.LogWarning($"{TAG} Failed to push {(isKeyFrame ? "IDR" : "P")} frame to decoder (buffer full or hardware busy)");
                         }
-                        return result;
+                        return instResult;
                     }
                     finally
                     {
@@ -252,26 +605,57 @@ namespace VRWorkspace.Native
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
+        // Throttle per-frame push-failure warnings so we don't spam the log when
+        // the decoder is busy; keep IDR + first-few-frames messages.
+        private int _pushFailLogCount;
+        private bool EncodedFramePushFailureShouldLog(bool isKeyFrame)
+        {
+            if (isKeyFrame) return true;
+            _pushFailLogCount++;
+            return _pushFailLogCount <= 5 || (_pushFailLogCount % 100) == 0;
+        }
+#endif
+
+#if UNITY_ANDROID && !UNITY_EDITOR
         /// <summary>
         /// Cache JNI method IDs on first use. This avoids AndroidJNIHelper reflection
         /// which triggers byte/sbyte deprecation warnings on every call.
         /// </summary>
         private void EnsureJniMethodIds()
         {
-            if (_bridgeRawObject != IntPtr.Zero) return;
-            
-            _bridgeRawObject = _decoderBridge.GetRawObject();
-            IntPtr classRef = AndroidJNI.GetObjectClass(_bridgeRawObject);
-            try
+            if (_bridgeRawObject != IntPtr.Zero && sPushFrameStaticId != IntPtr.Zero) return;
+
+            if (_decoderBridge != null && _bridgeRawObject == IntPtr.Zero)
             {
-                _decodeMethodId = AndroidJNI.GetMethodID(classRef, "decode", "([BJ)Z");
-                _pushFrameMethodId = AndroidJNI.GetMethodID(classRef, "pushEncodedFrame", "([BJZ)Z");
-                Debug.Log($"{TAG} JNI method IDs cached successfully");
+                _bridgeRawObject = _decoderBridge.GetRawObject();
+                IntPtr classRef = AndroidJNI.GetObjectClass(_bridgeRawObject);
+                try
+                {
+                    _decodeMethodId = AndroidJNI.GetMethodID(classRef, "decode", "([BJ)Z");
+                    _pushFrameMethodId = AndroidJNI.GetMethodID(classRef, "pushEncodedFrame", "([BJZ)Z");
+                }
+                finally
+                {
+                    AndroidJNI.DeleteLocalRef(classRef);
+                }
             }
-            finally
+
+            // Plan C: cache the static (J[BJZ)Z method on the bridge class so
+            // PushEncodedFrame can target the right native decoder handle
+            // regardless of the Java instance's mNativeHandle field (which is
+            // never set by createWithExternalTexture — that path is static).
+            if (sBridgeClassRef == IntPtr.Zero)
             {
-                AndroidJNI.DeleteLocalRef(classRef);
+                if (_bridgeClass == null)
+                    _bridgeClass = new AndroidJavaClass("com.vrworkspace.hevc.HevcDecoderBridge");
+                sBridgeClassRef = _bridgeClass.GetRawClass();
             }
+            if (sPushFrameStaticId == IntPtr.Zero)
+            {
+                sPushFrameStaticId = AndroidJNI.GetStaticMethodID(
+                    sBridgeClassRef, "pushEncodedFrame", "(J[BJZ)Z");
+            }
+            Debug.Log($"{TAG} JNI method IDs cached (instance + static)");
         }
 #endif
 
@@ -497,10 +881,22 @@ namespace VRWorkspace.Native
 #if UNITY_ANDROID && !UNITY_EDITOR
             lock (_lock)
             {
-                if (!_initialized || _disposed || _decoderBridge == null) return;
+                if (!_initialized || _disposed) return;
                 try
                 {
-                    _decoderBridge.Call("flush");
+                    // Plan C: the Java instance's mNativeHandle is never set,
+                    // so the instance flush() is a no-op. Call the static
+                    // handle-explicit variant instead.
+                    if (_surfaceModeHandle != 0L)
+                    {
+                        if (_bridgeClass == null)
+                            _bridgeClass = new AndroidJavaClass("com.vrworkspace.hevc.HevcDecoderBridge");
+                        _bridgeClass.CallStatic("flush", _surfaceModeHandle);
+                    }
+                    else if (_decoderBridge != null)
+                    {
+                        _decoderBridge.Call("flush");
+                    }
                     _hasFrame = false;
                     Debug.Log($"{TAG} Flushed");
                 }
@@ -518,15 +914,23 @@ namespace VRWorkspace.Native
         {
             lock (_lock)
             {
-                if (!_initialized) return;
+                if (!_initialized && _surfaceModeHandle == 0L) return;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
                 // CRITICAL: AndroidJNI/AndroidJavaObject CANNOT be used on the Finalizer thread (GC thread).
                 // Only release native resources if we are disposing explicitly from the main thread.
                 if (disposing && _decoderBridge != null)
                 {
+                    // Plan C: tear down the direct-surface decoder first (Java releases
+                    // Surface + SurfaceTexture references too), THEN fall through to
+                    // release any legacy decoder handle.
                     try
                     {
+                        if (_surfaceModeHandle != 0L)
+                        {
+                            _decoderBridge.CallStatic("releaseDirectSurface", _surfaceModeHandle);
+                            _surfaceModeHandle = 0L;
+                        }
                         _decoderBridge.Call("release");
                         _decoderBridge.Dispose();
                     }
@@ -541,6 +945,7 @@ namespace VRWorkspace.Native
                 }
 #endif
                 _initialized = false;
+                _isSurfaceMode = false;
                 _hasFrame = false;
                 _yPlaneBuffer = null;
                 _uvPlaneBuffer = null;
@@ -555,6 +960,190 @@ namespace VRWorkspace.Native
             Dispose(true);
             GC.SuppressFinalize(this);
         }
+
+        // ====================================================================
+        // Plan C: direct-surface mode API
+        // ====================================================================
+
+        /// <summary>
+        /// Starts a new decoder in surface mode using a Unity-side OpenGL texture
+        /// for output. MediaCodec's GPU color converter renders decoded frames
+        /// directly into the supplied texture, eliminating every async-upload
+        /// race surface present in the byte-buffer / Compute pipelines.
+        ///
+        /// <para>Lifecycle: on success, a handle > 0 is stored internally.
+        /// Call <see cref="TickFrame"/> once per Unity update to drain frames.
+        /// The shared texture (panel binding target) is exposed via
+        /// <see cref="SharedSurfaceTexture"/>. Call <see cref="Dispose"/> (or
+        /// this class's normal Dispose) when done to release both the
+        /// decoder and the Java-side Surface.</para>
+        /// </summary>
+        /// <param name="width">Video width</param>
+        /// <param name="height">Video height</param>
+        /// <param name="isH264">true for H.264, false for H.265</param>
+        /// <returns>true if the decoder was created</returns>
+        public bool StartDirectSurface(int width, int height, bool isH264)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(HevcDecoderPlugin));
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                if (_decoderBridge == null)
+                    _decoderBridge = new AndroidJavaObject("com.vrworkspace.hevc.HevcDecoderBridge");
+
+                if (_surfaceModeHandle != 0)
+                {
+                    Debug.LogWarning($"{TAG} StartDirectSurface: replacing existing handle {_surfaceModeHandle}");
+                    StopDirectSurface();
+                }
+
+                // Allocate a dual texture pair on the render thread:
+                //   oesId  = GL_TEXTURE_EXTERNAL_OES (SurfaceTexture writes here)
+                //   tex2dId = GL_TEXTURE_2D (Unity sampler2D reads here)
+                // A GPU blit copies OES → 2D each frame.
+                var (oesTexId, tex2dId) = AllocateOesTextureRenderThread(width, height);
+                if (oesTexId == 0 || tex2dId == 0)
+                {
+                    Debug.LogError($"{TAG} StartDirectSurface: dual-texture allocation failed ({width}x{height})");
+                    return false;
+                }
+
+                // Wrap the GL_TEXTURE_2D handle as a Unity Texture2D.
+                // The panel shader (sampler2D) will sample from this texture.
+                // The OES texture is given to Java SurfaceTexture — we blit
+                // OES → 2D each frame so the shader sees the decoded pixels.
+                IntPtr tex2dPtr = new IntPtr(tex2dId);
+                var externalTex = Texture2D.CreateExternalTexture(
+                    width, height, TextureFormat.RGBA32,
+                    mipChain: false, linear: true, tex2dPtr);
+                if (externalTex == null)
+                {
+                    Debug.LogError($"{TAG} StartDirectSurface: CreateExternalTexture(2D={tex2dId}) returned null");
+                    FreeOesTextureRenderThread(oesTexId, tex2dId);
+                    return false;
+                }
+                externalTex.name = $"DirectSurfaceRT_{width}x{height}";
+                externalTex.wrapMode = TextureWrapMode.Clamp;
+                externalTex.filterMode = FilterMode.Bilinear;
+
+                // Pass the OES handle to Java — SurfaceTexture is created from it.
+                long handle = _decoderBridge.CallStatic<long>(
+                    "createWithExternalTexture", width, height, isH264, oesTexId);
+                if (handle == 0L)
+                {
+                    Debug.LogError($"{TAG} StartDirectSurface: Java returned 0 (oesTexId={oesTexId} {width}x{height})");
+                    UnityEngine.Object.Destroy(externalTex);
+                    FreeOesTextureRenderThread(oesTexId, tex2dId);
+                    return false;
+                }
+
+                _surfaceModeHandle    = handle;
+                _surfaceModeOesTexId  = oesTexId;
+                _surfaceModeTex2dId   = tex2dId;
+                _surfaceModeTexture   = externalTex;
+                _width  = width;
+                _height = height;
+                _isSurfaceMode = true;
+                _initialized    = true;
+                Debug.Log($"[HevcDecoderPlugin] SURFACE_MODE_STARTED handle={handle} oesTexId={oesTexId} tex2dId={tex2dId} {width}x{height} build={Application.buildGUID}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"{TAG} StartDirectSurface exception: {ex.Message}");
+                return false;
+            }
+#else
+            Debug.LogWarning($"{TAG} StartDirectSurface only available on Android");
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// The shared Unity Texture2D whose backing GL handle is the OES
+        /// texture MediaCodec writes to. Bind this on the panel material's
+        /// main sampler so the panel shows the latest decoded frame. The
+        /// returned texture is owned by this decoder instance — do not
+        /// Destroy it; it is freed in <see cref="Dispose"/>.
+        /// </summary>
+        public Texture2D SharedSurfaceTexture => _surfaceModeTexture;
+
+        /// <summary>
+        /// Drain one or more decoded frames to the bound GL texture, then refresh
+        /// SurfaceTexture so the next panel sample sees the latest decoded data.
+        /// Call from Unity Update() each frame.
+        /// </summary>
+        /// <returns>number of frames drained (0-3). 0 means no frame available.</returns>
+        public int TickFrame(int frameTimeoutUs = 0)
+        {
+            if (_disposed || _surfaceModeHandle == 0L) return 0;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                int drained = _decoderBridge.CallStatic<int>("tickFrame", _surfaceModeHandle, frameTimeoutUs);
+                if (drained > 0)
+                {
+                    _hasFrame = true;
+                    // GPU blit: copy OES → 2D so Unity's sampler2D sees the
+                    // latest decoded frame. The blit executes on the render
+                    // thread before scene rendering in this same frame.
+                    BlitOesToTex2d();
+                }
+                return drained;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"{TAG} TickFrame: {ex.Message}");
+                return 0;
+            }
+#else
+            return 0;
+#endif
+        }
+
+        /// <summary>
+        /// Release the decoder handle AND tear down the Java-side Surface.
+        /// Idempotent. Call on stream shutdown before disposing the
+        /// SurfaceDirectBridge that owned the Unity texture.
+        /// </summary>
+        public void StopDirectSurface()
+        {
+            if (_surfaceModeHandle == 0L) return;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                _decoderBridge.CallStatic("releaseDirectSurface", _surfaceModeHandle);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"{TAG} StopDirectSurface: {ex.Message}");
+            }
+#endif
+            _surfaceModeHandle = 0L;
+            int freedOesId  = _surfaceModeOesTexId;
+            int freedTex2dId = _surfaceModeTex2dId;
+            _surfaceModeOesTexId = 0;
+            _surfaceModeTex2dId  = 0;
+            if (_surfaceModeTexture != null)
+            {
+                UnityEngine.Object.Destroy(_surfaceModeTexture);
+                _surfaceModeTexture = null;
+            }
+            // Free both native textures (OES + 2D) we allocated via the Unity plugin.
+            // Done last, after Unity has destroyed its wrapper, so no thread
+            // is still sampling the handle.
+            if (freedOesId != 0 || freedTex2dId != 0)
+            {
+#if UNITY_ANDROID && !UNITY_EDITOR
+                try { FreeOesTextureRenderThread(freedOesId, freedTex2dId); }
+                catch (Exception ex) { Debug.LogWarning($"{TAG} FreeOesTextureRenderThread: {ex.Message}"); }
+#endif
+            }
+            _hasFrame = false;
+            _initialized    = false;  // mirror what ReleaseDecoder does for byte-buffer path
+        }
+
+        // ====================================================================
 
         protected virtual void Dispose(bool disposing)
         {

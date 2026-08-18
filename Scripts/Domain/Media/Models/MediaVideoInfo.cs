@@ -21,6 +21,7 @@ namespace VRWorkspace.Media.Data
 
         #region Video Properties
         /// <summary>Video duration</summary>
+        [NonSerialized]
         public TimeSpan Duration;
 
         /// <summary>Detected projection type</summary>
@@ -61,6 +62,7 @@ namespace VRWorkspace.Media.Data
         public List<string> PlaylistIds;
 
         /// <summary>Last playback position for resume</summary>
+        [NonSerialized]
         public TimeSpan LastPosition;
         #endregion
 

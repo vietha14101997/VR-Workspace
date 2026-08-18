@@ -17,6 +17,8 @@ namespace VRWorkspace.UI.RTT.Components
         public event Action OnOpenClicked;
         public event Action OnRenameClicked;
         public event Action OnDeleteClicked;
+        /// <summary>Fired whenever the bar becomes visible (true) or hidden (false).</summary>
+        public event Action<bool> OnVisibilityChanged;
         #endregion
 
         #region Private Fields
@@ -109,6 +111,7 @@ namespace VRWorkspace.UI.RTT.Components
             if (_container == null || _isVisible == visible) return;
 
             _isVisible = visible;
+            OnVisibilityChanged?.Invoke(visible);
 
             // Stop any ongoing fade
             if (_fadeCoroutine != null)
@@ -159,7 +162,15 @@ namespace VRWorkspace.UI.RTT.Components
                 _container.SetActive(false);
             }
 
-            _isVisible = false;
+            if (_isVisible)
+            {
+                _isVisible = false;
+                OnVisibilityChanged?.Invoke(false);
+            }
+            else
+            {
+                _isVisible = false;
+            }
         }
 
         /// <summary>

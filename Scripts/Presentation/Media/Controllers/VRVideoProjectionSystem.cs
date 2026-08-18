@@ -30,6 +30,18 @@ namespace VRWorkspace.Media.Core
 
         /// <summary>Current projection root world rotation</summary>
         public Quaternion ProjectionRotation => _projectionRoot != null ? _projectionRoot.rotation : Quaternion.identity;
+
+        /// <summary>Current screen scale (1.0 = default, 0.5–3.0). Used by the Gaze-mode
+        /// Menu Button to keep its visual size and gaze-target collider proportional
+        /// to the video screen.</summary>
+        public float CurrentScale => _currentSettings.Scale;
+
+        /// <summary>Live flat-screen world position (recomputed every LateUpdate from
+        /// the camera's direction and the saved flat transform's distance). Falls back
+        /// to <see cref="SavedFlatPosition"/> when the lazy position cache hasn't been
+        /// populated yet. The Menu Button tracks this so it follows the video screen
+        /// when the user dollies the camera in/out.</summary>
+        public Vector3 FlatWorldPosition => _hasFlatWorldPosition ? _flatWorldPosition : _savedFlatPosition;
         #endregion
 
         #region Private Fields
@@ -38,6 +50,7 @@ namespace VRWorkspace.Media.Core
         private Transform _projectionRoot;
         private DisplaySettings _currentSettings = DisplaySettings.Default;
         private bool _isInitialized = false;
+        private Camera _cachedMainCamera; // Cached Camera.main — lookup is expensive per frame
 
         // Save flat position when switching to immersive so we can restore it
         private Vector3 _savedFlatPosition;
@@ -54,8 +67,8 @@ namespace VRWorkspace.Media.Core
         public bool HasSavedFlatTransform => _hasSavedFlatTransform;
 
         /// <summary>
-        /// Update saved flat transform without moving the projection root.
-        /// Used during recenter to point controls/sphere alignment toward the new forward direction.
+        /// Update the saved flat transform. Flat mode applies the pose atomically so
+        /// dependent UI never observes an intermediate pre-LateUpdate position.
         /// </summary>
         public void UpdateSavedFlatTransform(Vector3 position, Quaternion rotation)
         {
@@ -63,11 +76,38 @@ namespace VRWorkspace.Media.Core
             _savedFlatRotation = rotation;
             _hasSavedFlatTransform = true;
 
-            // Immediately recompute the flat world position so the projection screen 
-            // follows the new recentered direction in Flat mode.
-            if (IsVisible && !IsImmersiveProjection())
+            Camera cam = _cachedMainCamera != null ? _cachedMainCamera : (_cachedMainCamera = Camera.main);
+            if (cam != null)
             {
-                ComputeFlatWorldPosition();
+                Vector3 horizontal = position - cam.transform.position;
+                horizontal.y = 0f;
+                if (horizontal.sqrMagnitude > 0.001f)
+                {
+                    _flatDirection = horizontal.normalized;
+                }
+                else
+                {
+                    Vector3 rotationForward = rotation * Vector3.forward;
+                    rotationForward.y = 0f;
+                    if (rotationForward.sqrMagnitude > 0.001f)
+                        _flatDirection = rotationForward.normalized;
+                }
+            }
+
+            if (IsImmersiveProjection())
+            {
+                // The immersive root must remain camera-centered with identity rotation.
+                // Invalidate the flat cache so returning to flat recomputes from this pose.
+                _hasFlatWorldPosition = false;
+                return;
+            }
+
+            _flatWorldPosition = position;
+            _hasFlatWorldPosition = true;
+
+            if (_projectionRoot != null)
+            {
+                _projectionRoot.SetPositionAndRotation(position, rotation);
             }
         }
         #endregion
@@ -591,9 +631,10 @@ namespace VRWorkspace.Media.Core
         private void LateUpdate()
         {
             if (_projectionRoot == null) return;
+            if (!IsVisible) return; // Skip all work when projection is hidden
 
-            // Use Camera.main for consistent face-to-camera with controls UI
-            Camera cam = Camera.main;
+            // Cache Camera.main — the lookup internally does FindGameObjectWithTag.
+            var cam = _cachedMainCamera != null ? _cachedMainCamera : (_cachedMainCamera = Camera.main);
             if (cam == null) return;
 
             if (IsImmersiveProjection())
@@ -604,7 +645,7 @@ namespace VRWorkspace.Media.Core
                 _projectionRoot.position = cam.transform.position;
                 _projectionRoot.rotation = Quaternion.identity;
             }
-            else if (IsVisible && _hasFlatWorldPosition)
+            else if (_hasFlatWorldPosition)
             {
                 // Flat projection: apply cached world position (fixed in world space)
                 // and face-to-camera rotation.

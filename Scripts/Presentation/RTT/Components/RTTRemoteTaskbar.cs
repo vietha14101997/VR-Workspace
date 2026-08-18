@@ -21,7 +21,7 @@ namespace VRWorkspace.UI.RTT.Components
     /// RTTRemoteTaskbar - Taskbar for Remote Desktop streaming mode.
     /// Follows WorldPanelClusterRig and displays streaming metrics.
     ///
-    /// Section 1: Back, Bitrate (display), FPS (display), Passthrough, Recenter, Zoom (display)
+    /// Section 1: Back, resolution, FPS, screen settings, light, recenter.
     /// Section 2: Monitor 1-3 (dynamic display)
     /// Section 3: Latency text (replaces WiFi icon)
     /// </summary>
@@ -31,13 +31,25 @@ namespace VRWorkspace.UI.RTT.Components
         #region Static Instance
         private static RTTRemoteTaskbar _instance;
         public static RTTRemoteTaskbar Instance => _instance;
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// RTTRemoteTaskbar assigns _instance in Start() (not Awake), which means a ghost
+        /// reference from the previous Play session would survive and block the
+        /// duplicate-destroy guard during the 2nd Play onwards.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
         #endregion
 
         #region Configuration
         [Header("Icons")]
         [SerializeField] private Sprite iconBack;
-        [SerializeField] private Sprite iconEye;
-        [SerializeField] private Sprite iconEyeClose;
+        [SerializeField] private Sprite iconLightOn;
+        [SerializeField] private Sprite iconLightOff;
         [SerializeField] private Sprite iconRecenter;
         [SerializeField] private Sprite iconZoom;
         [SerializeField] private Sprite iconMonitor;
@@ -68,7 +80,7 @@ namespace VRWorkspace.UI.RTT.Components
         private GameObject _backButton;
         private GameObject _resolutionButton;
         private GameObject _fpsButton;
-        private GameObject _eyeButton;
+        private GameObject _lightButton;
         private int _currentResolutionHeight = 1080;
         private int _currentFps = 60;
 
@@ -89,10 +101,8 @@ namespace VRWorkspace.UI.RTT.Components
         // ClusterRig reference for panel enable/disable
         private WorldPanelClusterRig _clusterRig;
 
-        // State
-        private bool _isPassthroughOn = false;
         private bool _isLightOn = true; // Default ON
-        private bool _savedPassthroughState = false; // Lưu trạng thái passthrough khi tắt đèn
+        private MediaEnvironmentController _environmentController;
 
         // Colors
         private readonly Color _cyanColor = new Color(0f, 0.9f, 1f);
@@ -127,10 +137,13 @@ namespace VRWorkspace.UI.RTT.Components
             SetupLatencyDisplay();
 
             // Initialize environment controller
-            if (MediaEnvironmentController.Instance != null)
+            _environmentController = MediaEnvironmentController.Instance;
+            if (_environmentController != null)
             {
-                MediaEnvironmentController.Instance.Initialize();
-                MediaEnvironmentController.Instance.OnLightsChanged += HandleLightsChanged;
+                _environmentController.Initialize();
+                _environmentController.OnLightsChanged += HandleLightsChanged;
+                _isLightOn = _environmentController.LightsEnabled;
+                UpdateLightButtonVisual();
             }
 
             // Create expansion panel
@@ -142,17 +155,14 @@ namespace VRWorkspace.UI.RTT.Components
             // Bind to ViewModel
             BindToViewModel();
 
-            // Sync passthrough state
-            SyncPassthroughWithModeController();
-
             _miniFrame.MarkDirty();
         }
 
         private void OnDestroy()
         {
-            if (MediaEnvironmentController.Instance != null)
+            if (_environmentController != null)
             {
-                MediaEnvironmentController.Instance.OnLightsChanged -= HandleLightsChanged;
+                _environmentController.OnLightsChanged -= HandleLightsChanged;
             }
 
             if (_instance == this) _instance = null;
@@ -264,8 +274,8 @@ namespace VRWorkspace.UI.RTT.Components
             // 4. Screen Settings button (opens screen settings popup)
             _screenSettingsButton = CreateIconButton(section1, iconEnviroment, "ScreenSettings", _cyanColor, buttonSize, OnScreenSettingsClicked);
 
-            // 5. Eye button (opens expansion with Passthrough + Light)
-            _eyeButton = CreateIconButton(section1, iconEye, "Eye", _cyanColor, buttonSize, OnEyeClicked);
+            // 5. Light toggle
+            _lightButton = CreateIconButton(section1, iconLightOn, "Light", _cyanColor, buttonSize, ToggleLights);
 
             // 6. Recenter
             CreateIconButton(section1, iconRecenter, "Recenter", _cyanColor, buttonSize, RecenterObject);
@@ -454,8 +464,6 @@ namespace VRWorkspace.UI.RTT.Components
             // Subscribe to events
             _expansionPanel.OnResolutionSelected += OnExpansionResolutionSelected;
             _expansionPanel.OnFpsSelected += OnExpansionFpsSelected;
-            _expansionPanel.OnPassthroughToggled += OnPassthroughToggled;
-            _expansionPanel.OnLightToggled += OnLightToggled;
 
             Debug.Log("[RTTRemoteTaskbar] Expansion panel created in RTTToolbar");
         }
@@ -466,8 +474,6 @@ namespace VRWorkspace.UI.RTT.Components
             {
                 _expansionPanel.OnResolutionSelected -= OnExpansionResolutionSelected;
                 _expansionPanel.OnFpsSelected -= OnExpansionFpsSelected;
-                _expansionPanel.OnPassthroughToggled -= OnPassthroughToggled;
-                _expansionPanel.OnLightToggled -= OnLightToggled;
 
                 if (Application.isPlaying)
                     Destroy(_expansionPanel.gameObject);
@@ -547,12 +553,6 @@ namespace VRWorkspace.UI.RTT.Components
                 VRButtonFactory.SetBareIconButtonGlowColor(_fpsButton, color);
             }
 
-            // Eye button
-            if (_eyeButton != null)
-            {
-                Color color = (activeType == RTTTaskbarExpansion.ExpansionType.Eye) ? _purpleColor : _cyanColor;
-                VRButtonFactory.SetBareIconButtonGlowColor(_eyeButton, color);
-            }
         }
         #endregion
 
@@ -1048,224 +1048,39 @@ namespace VRWorkspace.UI.RTT.Components
         }
         #endregion
 
-        #region Eye Button (Passthrough + Light)
-        private void OnEyeClicked()
-        {
-            if (_expansionPanel == null) return;
-
-            HideScreenSettingsPopup();
-
-            // Toggle behavior: if already showing Eye options, hide it
-            if (_expansionPanel.IsVisible && _expansionPanel.CurrentType == RTTTaskbarExpansion.ExpansionType.Eye)
-            {
-                Debug.Log("[RTTRemoteTaskbar] Eye clicked - hiding expansion panel (toggle)");
-                _expansionPanel.Hide();
-                UpdateExpansionTriggerButtonColors(null);
-            }
-            else
-            {
-                // Show Eye options
-                Debug.Log("[RTTRemoteTaskbar] Eye clicked - showing expansion panel");
-                Vector3? buttonWorldPos = GetButtonWorldPosition(_eyeButton);
-                _expansionPanel.ShowEyeOptions(_isPassthroughOn, _isLightOn, buttonWorldPos);
-
-                // Disable passthrough button if light is OFF
-                _expansionPanel.SetPassthroughInteractable(_isLightOn);
-                UpdateExpansionTriggerButtonColors(RTTTaskbarExpansion.ExpansionType.Eye);
-            }
-            _miniFrame.MarkDirty();
-        }
-
-        private void SyncPassthroughWithModeController()
-        {
-            var modeController = FindAnyObjectByType<ModeController>();
-            if (modeController != null)
-            {
-                _isPassthroughOn = modeController.mode == ViewMode.RealWorld;
-                UpdateEyeButtonColor();
-            }
-
-            // Sync light state with RTTTaskbar
-            if (RTTTaskbar.Instance != null)
-            {
-                _isLightOn = RTTTaskbar.Instance.IsLightOn;
-                UpdateEyeButtonColor();
-            }
-        }
-
-        private void OnPassthroughToggled(bool isOn)
-        {
-            // Chặn toggle passthrough khi đèn đang tắt
-            if (!_isLightOn)
-            {
-                Debug.Log("[RTTRemoteTaskbar] Cannot toggle passthrough while light is OFF");
-                return;
-            }
-
-            _isPassthroughOn = isOn;
-            Debug.Log($"[RTTRemoteTaskbar] Passthrough toggled: {(_isPassthroughOn ? "ON" : "OFF")}");
-
-            UpdateEyeButtonColor();
-
-            var modeController = FindAnyObjectByType<ModeController>();
-            if (modeController != null)
-            {
-                modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
-            }
-
-            _miniFrame.MarkDirty();
-        }
-
+        #region Light Button
         private void HandleLightsChanged(bool isOn)
         {
             if (_isLightOn == isOn) return;
 
             _isLightOn = isOn;
-            UpdateEyeButtonColor();
-
-            if (_expansionPanel != null)
-            {
-                _expansionPanel.SetLightState(isOn);
-            }
+            UpdateLightButtonVisual();
 
             _miniFrame.MarkDirty();
             Debug.Log($"[RTTRemoteTaskbar] Light state synchronized to: {(isOn ? "ON" : "OFF")}");
         }
 
-        private void OnLightToggled(bool isOn)
+        private void ToggleLights()
         {
-            _isLightOn = isOn;
-            Debug.Log($"[RTTRemoteTaskbar] Light toggled: {(_isLightOn ? "ON" : "OFF")}");
-
-            // Use MediaEnvironmentController for unified light/environment management
-            var envController = MediaEnvironmentController.Instance;
-            if (envController != null)
-            {
-                envController.SetLightsEnabled(isOn);
-            }
-
-            var modeController = FindAnyObjectByType<ModeController>();
-
-            if (!_isLightOn)
-            {
-                // Tắt đèn: lưu trạng thái passthrough, tắt passthrough
-                _savedPassthroughState = _isPassthroughOn;
-
-                if (modeController != null)
-                {
-                    // Tắt passthrough trực tiếp
-                    if (modeController.cameraPassthrough != null)
-                    {
-                        modeController.cameraPassthrough.enabled = false;
-                    }
-
-                    // Tắt backgroundReal (tránh màn hình trắng khi passthrough đang ON)
-                    if (modeController.backgroundReal != null)
-                    {
-                        modeController.backgroundReal.enabled = false;
-                    }
-
-                    // Bật backgroundVirtual để hiển thị màu đen (clear color)
-                    if (modeController.backgroundVirtual != null)
-                    {
-                        modeController.backgroundVirtual.enabled = true;
-                    }
-                }
-
-                // Cập nhật trạng thái passthrough trong expansion panel
-                _isPassthroughOn = false;
-                if (_expansionPanel != null)
-                {
-                    _expansionPanel.SetPassthroughState(false);
-                    _expansionPanel.SetPassthroughInteractable(false); // Disable nút passthrough
-                }
-            }
-            else
-            {
-                // Bật đèn: khôi phục virtual environment và passthrough state
-                if (modeController != null)
-                {
-                    // Khôi phục passthrough state
-                    if (_savedPassthroughState)
-                    {
-                        _isPassthroughOn = true;
-                        // Dùng SetMode để khôi phục đầy đủ (bật backgroundReal, passthrough, ẩn virtualEnv)
-                        modeController.SetMode(ViewMode.RealWorld);
-                    }
-                    else
-                    {
-                        // No passthrough mode changes needed, environment visibility handled by MediaEnvironmentController
-                    }
-                }
-
-                // Enable lại nút passthrough trong expansion
-                if (_expansionPanel != null)
-                {
-                    _expansionPanel.SetPassthroughState(_isPassthroughOn);
-                    _expansionPanel.SetPassthroughInteractable(true);
-                }
-            }
-
-            UpdateEyeButtonColor();
-            _miniFrame.MarkDirty();
-
-            // Sync with RTTTaskbar
-            if (RTTTaskbar.Instance != null)
-            {
-                RTTTaskbar.Instance.SyncLightState(_isLightOn, _savedPassthroughState);
-            }
+            HideScreenSettingsPopup();
+            HideExpansionPanel();
+            _environmentController?.ToggleLights();
         }
 
-        /// <summary>
-        /// Sync light state from another taskbar (UI only, no ModeController changes).
-        /// </summary>
-        public void SyncLightState(bool isLightOn, bool savedPassthroughState)
+        private void UpdateLightButtonVisual()
         {
-            if (_isLightOn == isLightOn) return;
+            if (_lightButton == null) return;
 
-            _isLightOn = isLightOn;
-            _savedPassthroughState = savedPassthroughState;
+            bool isNonDefault = !_isLightOn;
+            Color targetColor = isNonDefault ? _purpleColor : _cyanColor;
+            Sprite targetIcon = _isLightOn ? iconLightOn : iconLightOff;
 
-            if (!_isLightOn)
-            {
-                _isPassthroughOn = false;
-            }
-            else if (_savedPassthroughState)
-            {
-                _isPassthroughOn = true;
-            }
-
-            // Update expansion panel if visible
-            if (_expansionPanel != null)
-            {
-                _expansionPanel.SetPassthroughState(_isPassthroughOn);
-                _expansionPanel.SetPassthroughInteractable(_isLightOn);
-            }
-
-            UpdateEyeButtonColor();
-            _miniFrame.MarkDirty();
-
-            Debug.Log($"[RTTRemoteTaskbar] Light state synced: {(_isLightOn ? "ON" : "OFF")}");
-        }
-
-        private void UpdateEyeButtonColor()
-        {
-            if (_eyeButton == null) return;
-
-            // Eye button is purple if passthrough is ON or light is OFF (non-default states)
-            bool hasActiveState = _isPassthroughOn || !_isLightOn;
-            Color targetColor = hasActiveState ? _purpleColor : _cyanColor;
-
-            // Determine icon: eye_close when light is OFF, eye when light is ON
-            Sprite targetIcon = _isLightOn ? iconEye : iconEyeClose;
-
-            Transform iconTransform = _eyeButton.transform.Find("HitArea/Visuals/Content/Icon");
+            Transform iconTransform = _lightButton.transform.Find("HitArea/Visuals/Content/Icon");
             if (iconTransform != null)
             {
                 Image iconImg = iconTransform.GetComponent<Image>();
                 if (iconImg != null)
                 {
-                    // Update icon sprite based on light state
                     if (targetIcon != null)
                     {
                         iconImg.sprite = targetIcon;
@@ -1284,172 +1099,26 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
-            // Force hover (scale effect) when in active state (purple)
-            var hoverController = _eyeButton.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
+            var hoverController = _lightButton.GetComponentInChildren<VRWorkspace.UI.HoverEffects.HoverEffectController>();
             if (hoverController != null)
             {
-                hoverController.SetForceHover(hasActiveState);
-            }
-        }
-
-        public void SetPassthrough(bool isOn)
-        {
-            if (_isPassthroughOn != isOn)
-            {
-                _isPassthroughOn = isOn;
-                UpdateEyeButtonColor();
-
-                var modeController = FindAnyObjectByType<ModeController>();
-                if (modeController != null)
-                {
-                    modeController.SetMode(_isPassthroughOn ? ViewMode.RealWorld : ViewMode.VirtualSpace);
-                }
-
-                _miniFrame.MarkDirty();
+                hoverController.SetForceHover(isNonDefault);
             }
         }
 
         public void SetLight(bool isOn)
         {
-            if (_isLightOn != isOn)
-            {
-                OnLightToggled(isOn);
-            }
+            _environmentController?.SetLightsEnabled(isOn);
         }
         #endregion
 
-        #region Recenter
         private void RecenterObject()
         {
             Debug.Log("[RTTRemoteTaskbar] Recenter clicked");
-            StartCoroutine(RecenterRoutine());
+            Transform fallback = _miniFrame != null ? _miniFrame.GetFollowTarget() : transform;
+            StartCoroutine(VirtualObjectsRecenter.RunWithReticleProgress(
+                this, fallback, iconRecenter, () => _miniFrame?.MarkDirty()));
         }
-
-        private IEnumerator RecenterRoutine()
-        {
-            VRGazeReticle reticle = VRGazeReticle.Instance;
-            if (reticle == null) reticle = FindAnyObjectByType<VRGazeReticle>();
-
-            if (reticle != null)
-            {
-                reticle.EnterRecenterMode(iconRecenter);
-            }
-
-            float duration = 2.0f;
-            float elapsed = 0f;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / duration);
-
-                if (reticle != null)
-                {
-                    reticle.UpdateRecenterProgress(progress);
-                }
-
-                yield return null;
-            }
-
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                RecenterAllVirtualObjects(cam);
-            }
-
-            if (reticle != null)
-            {
-                reticle.ExitRecenterMode();
-            }
-
-            _miniFrame.MarkDirty();
-            Debug.Log("[RTTRemoteTaskbar] Recenter complete.");
-        }
-
-        private void RecenterAllVirtualObjects(Camera cam)
-        {
-            GameObject virtualObjectsParent = GameObject.Find("VirtualObjects");
-            if (virtualObjectsParent == null)
-            {
-                Debug.LogWarning("[RTTRemoteTaskbar] VirtualObjects parent not found");
-                RecenterFollowTarget(cam);
-                return;
-            }
-
-            // Find primary menu frame as pivot
-            RTTMenuFrame primary = RTTMenuFrame.PrimaryInstance;
-            if (primary == null)
-            {
-                RecenterFollowTarget(cam);
-                return;
-            }
-
-            Vector3 pivotPos = primary.transform.position;
-            Quaternion pivotRot = primary.transform.rotation;
-
-            List<Transform> children = new List<Transform>();
-            List<Vector3> relativePositions = new List<Vector3>();
-            List<Quaternion> relativeRotations = new List<Quaternion>();
-
-            foreach (Transform child in virtualObjectsParent.transform)
-            {
-                children.Add(child);
-                Vector3 relPos = Quaternion.Inverse(pivotRot) * (child.position - pivotPos);
-                relativePositions.Add(relPos);
-                Quaternion relRot = Quaternion.Inverse(pivotRot) * child.rotation;
-                relativeRotations.Add(relRot);
-            }
-
-            Vector3 camForward = cam.transform.forward;
-            camForward.y = 0;
-            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-            camForward.Normalize();
-
-            Vector3 camPos = cam.transform.position;
-            float hDist = Vector2.Distance(
-                new Vector2(pivotPos.x, pivotPos.z),
-                new Vector2(camPos.x, camPos.z)
-            );
-
-            Vector3 newPivotPos = camPos + camForward * hDist;
-            newPivotPos.y = pivotPos.y;
-            Quaternion newPivotRot = Quaternion.LookRotation(camForward);
-
-            for (int i = 0; i < children.Count; i++)
-            {
-                Transform child = children[i];
-                child.position = newPivotPos + newPivotRot * relativePositions[i];
-                child.rotation = newPivotRot * relativeRotations[i];
-            }
-        }
-
-        private void RecenterFollowTarget(Camera cam)
-        {
-            var followTarget = _miniFrame.GetFollowTarget();
-            if (followTarget != null)
-            {
-                RecenterTransform(followTarget, cam);
-            }
-        }
-
-        private void RecenterTransform(Transform target, Camera cam)
-        {
-            Vector3 camForward = cam.transform.forward;
-            camForward.y = 0;
-            if (camForward.sqrMagnitude < 0.001f) camForward = Vector3.forward;
-            camForward.Normalize();
-
-            Vector3 currentPos = target.position;
-            Vector3 camPos = cam.transform.position;
-            float hDist = Vector2.Distance(new Vector2(currentPos.x, currentPos.z), new Vector2(camPos.x, camPos.z));
-
-            Vector3 newPos = camPos + camForward * hDist;
-            newPos.y = currentPos.y;
-
-            target.position = newPos;
-            target.rotation = Quaternion.LookRotation(camForward);
-        }
-        #endregion
 
         #region Button Factory
         private GameObject CreateIconButton(Transform parent, Sprite icon, string name, Color glowColor, float buttonSize, Action onClick)
@@ -1599,8 +1268,6 @@ namespace VRWorkspace.UI.RTT.Components
         #endregion
 
         #region Public API
-        public bool IsPassthroughOn => _isPassthroughOn;
-
         /// <summary>
         /// Set the follow target (typically WorldPanelClusterRig).
         /// </summary>
@@ -1679,8 +1346,8 @@ namespace VRWorkspace.UI.RTT.Components
         {
             // Static icons
             if (iconBack == null) iconBack = LoadIcon("back");
-            if (iconEye == null) iconEye = LoadIcon("eye");
-            if (iconEyeClose == null) iconEyeClose = LoadIcon("eye_close");
+            if (iconLightOn == null) iconLightOn = LoadIcon("light_on");
+            if (iconLightOff == null) iconLightOff = LoadIcon("light_off");
             if (iconRecenter == null) iconRecenter = LoadIcon("recenter");
             if (iconZoom == null) iconZoom = LoadIcon("zoom");
             if (iconMonitor == null) iconMonitor = LoadIcon("resolution");
@@ -1721,7 +1388,7 @@ namespace VRWorkspace.UI.RTT.Components
                 }
             }
 
-            Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, Eye:{iconEye != null}, EyeClose:{iconEyeClose != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
+            Debug.Log($"[RTTRemoteTaskbar] Icons loaded - Back:{iconBack != null}, LightOn:{iconLightOn != null}, LightOff:{iconLightOff != null}, Recenter:{iconRecenter != null}, Zoom:{iconZoom != null}, Monitor:{iconMonitor != null}");
             Debug.Log($"[RTTRemoteTaskbar] Loaded icons - Resolution: {_resolutionIcons.Count}, FPS: {_fpsIcons.Count}/3, Screens: {_screenIcons.Count}/3");
         }
 

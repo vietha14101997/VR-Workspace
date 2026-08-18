@@ -12,7 +12,6 @@ using VRWorkspace.Core;
 using VRWorkspace.Core.Coroutines;
 using VRWorkspace.ViewModels;
 using VRWorkspace.UI.RTT;
-using VRWorkspace.VRInput;
 using VRWorkspace.Media.Core;
 using VRWorkspace.Panel;
 using VRWorkspace.UI.RTT.Components;
@@ -65,6 +64,19 @@ namespace VRWorkspace.UI.RTT
                 return _instance;
             }
         }
+
+        /// <summary>
+        /// Reset static singleton state at the start of each Play session.
+        /// Without this, _applicationQuitting stays true after the previous session's
+        /// OnApplicationQuit, causing Instance to return null on the next Play.
+        /// See: https://docs.unity3d.com/ScriptReference/RuntimeInitializeOnLoadMethodAttribute.html
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            _instance = null;
+            _applicationQuitting = false;
+        }
         #endregion
 
         #region Configuration Assets
@@ -115,11 +127,7 @@ namespace VRWorkspace.UI.RTT
         [SerializeField] private bool autoShowMainMenu = true;
 
         [Tooltip("Pre-initialize all app menus in background after main menu stabilizes")]
-        [SerializeField] private bool enableBackgroundPreInit = true;
-
-        [Header("Auto Recenter")]
-        [Tooltip("Automatically recenter objects in front of user when app starts")]
-        [SerializeField] private bool autoRecenterOnStart = true;
+        [SerializeField] private bool enableBackgroundPreInit = false;
         #endregion
 
         #region Panel Management Fields
@@ -133,9 +141,24 @@ namespace VRWorkspace.UI.RTT
         private RTTQualityManager _qualityManager;
         private RTTAppManager _appManager;
 
+#if UNITY_ANDROID && !UNITY_EDITOR
+        // Rising-edge latch + cooldown for Cardboard's IsGearButtonPressed / IsCloseButtonPressed.
+        // These return true for the entire press duration — without latching, we would
+        // fire ScanDeviceParams() / Application.Quit() every frame and stack multiple
+        // QR scanner activities (forcing 4× back-presses to dismiss).
+        //
+        // Cooldown is needed for a subtle edge case: when the user holds the gear
+        // button while the QR scanner activity is open, Update() is paused. On
+        // returning to the app, the latch is stale and a fresh rising edge fires
+        // immediately, opening another scanner. The cooldown prevents this.
+        private bool _wasGearButtonPressed;
+        private bool _wasCloseButtonPressed;
+        private float _lastGearScanTime = -10f;
+        private const float GEAR_SCAN_COOLDOWN = 2.0f; // seconds
+#endif
+
         // Extracted responsibility managers
         private RTTThemeManager _themeManager;
-        private RTTRecenterController _recenterController;
         private RTTImmersiveModeController _immersiveModeController;
         private Dictionary<RTTAppRegistry.AppType, IRTTAppContentFactory> _appFactories;
         #endregion
@@ -149,7 +172,9 @@ namespace VRWorkspace.UI.RTT
         private GameObject _mainMenuContent;
         private bool _mainMenuInitialized = false;
         private bool _mainMenuCreating = false;
-        private bool _hasAutoRecentered = false;
+
+        // Pause state to avoid expensive rendering while app is backgrounded
+        private bool _isPaused = false;
 
         // Stored delegate for theme property change subscription (allows clean unsubscribe)
         private Action _themePropertyChangedDelegate;
@@ -324,13 +349,6 @@ namespace VRWorkspace.UI.RTT
                 Api.ScanDeviceParams();
             }
     #endif
-
-            // Initialize NonVRModeController if not present
-            if (NonVRModeController.Instance == null)
-            {
-                var controllerGO = new GameObject("NonVRModeController");
-                controllerGO.AddComponent<NonVRModeController>();
-            }
         }
 
         private void Update()
@@ -339,31 +357,32 @@ namespace VRWorkspace.UI.RTT
             _qualityManager?.PeriodicUpdate();
 
     #if UNITY_ANDROID && !UNITY_EDITOR
-            // Skip Cardboard API calls when in non-VR mode (XR is deinitialized)
-            if (NonVRModeController.Instance == null || !NonVRModeController.Instance.IsNonVRMode)
+            // Rising-edge detection + cooldown: Cardboard's IsGearButtonPressed returns true
+            // for the entire press duration. Without latching we stack QR activities.
+            // Cooldown guards the resume-from-scanner edge case where the latch is
+            // stale (Update paused while in scanner) and would false-trigger.
+            bool gearPressed = Api.IsGearButtonPressed;
+            if (gearPressed && !_wasGearButtonPressed
+                && Time.unscaledTime - _lastGearScanTime > GEAR_SCAN_COOLDOWN)
             {
-                if (Api.IsGearButtonPressed)
-                {
-                    Api.ScanDeviceParams();
-                }
-
-                if (Api.IsCloseButtonPressed)
-                {
-                    Application.Quit();
-                }
-
-                if (Api.IsTriggerHeldPressed)
-                {
-                    PerformInstantRecenter();
-                }
-
-                if (Api.HasNewDeviceParams())
-                {
-                    Api.ReloadDeviceParams();
-                }
-
-                Api.UpdateScreenParams();
+                Api.ScanDeviceParams();
+                _lastGearScanTime = Time.unscaledTime;
             }
+            _wasGearButtonPressed = gearPressed;
+
+            bool closePressed = Api.IsCloseButtonPressed;
+            if (closePressed && !_wasCloseButtonPressed)
+            {
+                Application.Quit();
+            }
+            _wasCloseButtonPressed = closePressed;
+
+            if (Api.HasNewDeviceParams())
+            {
+                Api.ReloadDeviceParams();
+            }
+
+            Api.UpdateScreenParams();
     #endif
         }
 
@@ -382,6 +401,51 @@ namespace VRWorkspace.UI.RTT
         private void OnApplicationQuit()
         {
             _applicationQuitting = true;
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            _isPaused = pauseStatus;
+
+            var panels = _panelManager?.RegisteredPanels;
+            if (panels == null) return;
+
+            if (pauseStatus)
+            {
+                // Backgrounded: disable RTT UI cameras to free GPU and avoid
+                // wasted rendering while the user cannot see the panels.
+                int disabled = 0;
+                foreach (var panel in panels)
+                {
+                    if (panel == null) continue;
+                    var cam = panel.GetUICamera();
+                    if (cam != null && cam.enabled)
+                    {
+                        cam.enabled = false;
+                        disabled++;
+                    }
+                }
+                Debug.Log($"[RTTManager] Paused - disabled {disabled} RTT cameras");
+            }
+            else
+            {
+                // Resumed: re-enable cameras and mark all panels dirty so they
+                // re-render fresh content. Android may have reclaimed textures
+                // while in background.
+                int enabled = 0;
+                foreach (var panel in panels)
+                {
+                    if (panel == null) continue;
+                    var cam = panel.GetUICamera();
+                    if (cam != null && !cam.enabled)
+                    {
+                        cam.enabled = true;
+                        enabled++;
+                    }
+                    panel.MarkDirty();
+                }
+                Debug.Log($"[RTTManager] Resumed - re-enabled {enabled} RTT cameras and marked panels dirty");
+            }
         }
         #endregion
 
@@ -415,9 +479,6 @@ namespace VRWorkspace.UI.RTT
             _themeManager = new RTTThemeManager(themeConfig, primaryFont);
             _themeManager.OnThemeChanged += () => OnThemeChanged?.Invoke();
             _themeManager.OnFontChanged += () => OnFontChanged?.Invoke();
-
-            // Recenter Controller
-            _recenterController = new RTTRecenterController();
 
             // Immersive Mode Controller
             _immersiveModeController = new RTTImmersiveModeController();
@@ -535,12 +596,6 @@ namespace VRWorkspace.UI.RTT
 
             try
             {
-                // Start camera-follow immediately (before waiting for MainMenu)
-                if (autoRecenterOnStart && !_hasAutoRecentered)
-                {
-                    StartStartupCameraFollow();
-                }
-
                 // Wait for ContentContainer to be ready (spread across frames)
                 await UniTask.WaitUntil(() => mainMenuFrame.ContentContainer != null,
                     cancellationToken: this.GetCancellationTokenOnDestroy());
@@ -562,37 +617,6 @@ namespace VRWorkspace.UI.RTT
             {
                 _mainMenuCreating = false;
             }
-        }
-
-        /// <summary>
-        /// Start continuous camera-follow at startup.
-        /// VirtualObjects track camera's horizontal axis until camera tracking is detected
-        /// AND MainMenu initialization is complete.
-        /// </summary>
-        private void StartStartupCameraFollow()
-        {
-            _recenterController?.StartStartupCameraFollow();
-        }
-
-        private void LateUpdate()
-        {
-            if (_recenterController == null || !_recenterController.IsFollowActive) return;
-
-            bool completed = _recenterController.UpdateCameraFollow(_mainMenuInitialized);
-            if (completed)
-            {
-                _hasAutoRecentered = true;
-            }
-        }
-
-        /// <summary>
-        /// Perform instant recenter without animation.
-        /// Moves all VirtualObjects to face the camera.
-        /// Also calls Cardboard API Recenter on Android to reset headset tracking.
-        /// </summary>
-        public void PerformInstantRecenter()
-        {
-            _recenterController?.PerformInstantRecenter();
         }
 
         /// <summary>

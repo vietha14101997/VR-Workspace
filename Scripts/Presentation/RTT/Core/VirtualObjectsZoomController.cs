@@ -18,6 +18,17 @@ namespace VRWorkspace.UI.RTT
         #region Singleton
         private static VirtualObjectsZoomController _instance;
         public static VirtualObjectsZoomController Instance => _instance;
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, _instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
         #endregion
 
         #region Configuration
@@ -273,8 +284,10 @@ namespace VRWorkspace.UI.RTT
             Vector3 cameraPos = cam.transform.position;
             Vector3 primaryPos = _primaryFrame.transform.position;
 
-            // CRITICAL: Direction from Camera to Primary, NOT camera.forward
-            // This ensures zoom maintains relative positions regardless of camera orientation
+            // Capture the original Y offset between primary frame and camera.
+            // Goal: whatever toPrimary.y is right now, it must be the same after the move.
+            float yOffset = primaryPos.y - cameraPos.y;
+
             Vector3 toPrimary = primaryPos - cameraPos;
             float currentDist = toPrimary.magnitude;
 
@@ -290,8 +303,17 @@ namespace VRWorkspace.UI.RTT
             // Calculate delta distance to move
             float deltaDist = newDistance - currentDist;
 
-            // Move entire VirtualObjects container along this direction
-            virtualObjectsRoot.position += direction * deltaDist;
+            // Apply movement along the full 3D direction
+            Vector3 newPos = virtualObjectsRoot.position + direction * deltaDist;
+
+            // Preserve Y offset: virtualObjectsRoot.y must yield (primary.y - camera.y) == yOffset.
+            // Primary frame sits at localPos.y = 0 inside VirtualObjects, so primary.y == virtualObjectsRoot.y.
+            // Therefore we set newPos.y so that primary.y - camera.y == yOffset.
+            float newCameraY = cam.transform.position.y;
+            float targetRootY = newCameraY + yOffset;
+            newPos.y = targetRootY;
+
+            virtualObjectsRoot.position = newPos;
 
             _currentDistance = newDistance;
 
@@ -870,26 +892,6 @@ namespace VRWorkspace.UI.RTT
             }
 
             return Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
-        }
-        #endregion
-
-        #region Recenter Support
-        /// <summary>
-        /// Called after recenter operation to recalculate current distance.
-        /// </summary>
-        public void OnRecenter()
-        {
-            if (_primaryFrame == null || Camera.main == null) return;
-
-            // Recalculate distance after recenter
-            _currentDistance = Vector3.Distance(
-                Camera.main.transform.position,
-                _primaryFrame.transform.position
-            );
-
-            _currentDistance = Mathf.Clamp(_currentDistance, minDistance, maxDistance);
-
-            Debug.Log($"[VirtualObjectsZoomController] Recenter: distance recalculated to {_currentDistance:F2}m");
         }
         #endregion
 

@@ -26,6 +26,17 @@ namespace VRWorkspace.UI.RTT.Components
         #region Singleton
         private static RTTToolbar _instance;
         public static RTTToolbar Instance => _instance;
+
+        /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, _instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            _instance = null;
+        }
         #endregion
 
         #region Configuration

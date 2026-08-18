@@ -1,0 +1,83 @@
+// NV12ToRGBA.compute
+// Decodes NV12 video frames into RGBA8 on a RenderTexture.
+//
+// Inputs:
+//   - Y plane: W*H bytes, 1 byte per luma sample.
+//   - UV plane: (W/2)*(H/2)*2 bytes, NV12 planar interleaving (CbCr pair per 2x2 block).
+//   - Output: an RGBA RenderTexture (ARGB32 = RGBA8 in Unity's byte order).
+//
+// Why this exists:
+//   The byte-buffer pipeline (Texture2D.LoadRawTextureData + Apply) races
+//   asynchronously on Mali/Adreno, producing the "đè trùng" / stale-pixels
+//   artifact on browser tab switches. ComputeShader + ComputeBuffer.SetData
+//   round-trip through a small staging area that is GPU-coherent on Adreno,
+//   eliminating the race entirely in a single GPU dispatch per frame.
+//
+// Shader model 5.0 required for ByteAddressBuffer (Unity 6 -> SM 4.5 default,
+// we bump per-shader via the Unity inspector or pragma in the matching .shader).
+#pragma target 5.0
+#pragma kernel CSMain
+
+// NV12 Y plane: W*H bytes, 1 byte per pixel, packed as a byte-addressable
+// buffer so we can do unaligned byte reads. (We could also pack into uint
+// and do manual decode but ByteAddressBuffer is simpler.)
+ByteAddressBuffer _YBuf;
+
+// NV12 UV plane: (W*H)/2 bytes, packed (CbCr pair per 2x2 block, planar).
+ByteAddressBuffer _UVBuf;
+
+RWTexture2D<float4> _Result;
+
+uint _Width;
+uint _Height;
+float _FlipY;
+
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    uint x = id.x;
+    uint y = id.y;
+    if (x >= _Width || y >= _Height) return;
+
+    // ─── Y sample ────────────────────────────────────────────────────────────
+    // Address = srcY * Width + x. ByteAddressBuffer.Load reads 4 bytes from
+    // an arbitrary byte offset, so byte addressing is fine.
+    uint srcY = _FlipY > 0.5 ? (_Height - 1u - y) : y;
+    uint yByteAddr = srcY * _Width + x;
+    uint yWord = _YBuf.Load(yByteAddr & ~3u);
+    uint yShift = (yByteAddr & 3u) * 8u;
+    float Y = ((yWord >> yShift) & 0xFFu) / 255.0;
+
+    // ─── UV sample (NV12 planar, 2x2 macroblock share UV pair) ─────────────
+    uint uvSrcY = _FlipY > 0.5 ? (_Height / 2u - 1u - (y >> 1u)) : (y >> 1u);
+    uint uvX = x >> 1u;
+    uint uvByteAddr = (uvSrcY * (_Width >> 1u) + uvX) * 2u;
+    // U and V live in adjacent bytes. Could be in same word or straddle
+    // a word boundary. Handle the straddle case explicitly.
+    uint uvWordA = _UVBuf.Load(uvByteAddr & ~3u);
+    uint uvFirstByte = uvByteAddr & 3u;
+    float U = ((uvWordA >> (uvFirstByte * 8u)) & 0xFFu) / 255.0;
+    float V;
+    if (uvFirstByte == 3u)
+    {
+        // V is in the next word's byte 0
+        uint uvWordB = _UVBuf.Load((uvByteAddr & ~3u) + 4u);
+        V = (uvWordB & 0xFFu) / 255.0;
+    }
+    else
+    {
+        V = ((uvWordA >> ((uvFirstByte + 1u) * 8u)) & 0xFFu) / 255.0;
+    }
+
+    // ─── NV12 → RGB (BT.601 limited range) ────────────────────────────────
+    // Y: 16-235 → 0-1; U/V: 16-240 → -0.5..+0.5
+    float yLin = saturate((Y - 0.0627) * 1.164);
+    float uLin = (U - 0.5) * 2.018;
+    float vLin = (V - 0.5) * 1.813;
+
+    float r = saturate(yLin + 1.596 * vLin);
+    float g = saturate(yLin - 0.392 * uLin - 0.813 * vLin);
+    float b = saturate(yLin + 2.017 * uLin);
+
+    _Result[id.xy] = float4(r, g, b, 1.0);
+}

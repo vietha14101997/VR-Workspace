@@ -7,6 +7,12 @@ namespace VRWorkspace.Streaming
 {
     public partial class PhaseProtocolClient
     {
+        // ── Video frame counters per track for device-build diagnostics ──
+        // AppLog is stripped from builds, so these use Debug.Log with throttling
+        private readonly System.Collections.Generic.Dictionary<int, int> _h265FrameCountPerTrack
+            = new System.Collections.Generic.Dictionary<int, int>();
+        private float _lastH265DiagTime;
+
         /// <summary>
         /// Handle H.265 video frames from dedicated unreliable DataChannel.
         /// Separated from cursor DC to avoid SCTP head-of-line blocking on audio.
@@ -16,6 +22,26 @@ namespace VRWorkspace.Streaming
             if (data == null || data.Length < 2) return;
 
             byte msgType = data[0];
+
+            // Track per-monitor frame count for diagnostics (visible on device builds)
+            if (msgType >= 0x02 && msgType <= 0x04 && data.Length >= 2)
+            {
+                int trackIdx = data[1];
+                if (!_h265FrameCountPerTrack.ContainsKey(trackIdx))
+                    _h265FrameCountPerTrack[trackIdx] = 0;
+                _h265FrameCountPerTrack[trackIdx]++;
+
+                // Throttled diagnostic log: every 5 seconds, log frame count per track
+                float now = UnityEngine.Time.realtimeSinceStartup;
+                if (now - _lastH265DiagTime > 5f)
+                {
+                    _lastH265DiagTime = now;
+                    var sb = new StringBuilder("[H265-DIAG] Frames per track:");
+                    foreach (var kv in _h265FrameCountPerTrack)
+                        sb.Append($" T{kv.Key}={kv.Value}");
+                    Debug.Log(sb.ToString());
+                }
+            }
 
             if (msgType == 0x02)
             {
@@ -119,95 +145,80 @@ namespace VRWorkspace.Streaming
         private readonly System.Collections.Generic.HashSet<int> _taintedTracks
             = new System.Collections.Generic.HashSet<int>();
 
+        // ── Per-track reassembly status ──
+        private readonly System.Collections.Generic.HashSet<int> _reassemblingIdrTracks
+            = new System.Collections.Generic.HashSet<int>();
+
+        // ── P-frame chunk reassembly state ──
+        private readonly System.Collections.Generic.Dictionary<int, byte[][]> _pframeChunks
+            = new System.Collections.Generic.Dictionary<int, byte[][]>();
+        private int _pframeCount = 0;
+
         /// <summary>
         /// Handle H265 IDR keyframe data received via DataChannel side-channel.
-        /// Format: [type=0x03][trackIndex(1)][chunkIndex(1)][totalChunks(1)][IDR Annex-B data...]
-        /// Large IDR frames are split into chunks by the server. Client reassembles and feeds
-        /// the complete IDR directly to the decoder, bypassing the Encoded Transform API.
+        /// Robust to out-of-order chunks on unordered SCTP.
+        ///
+        /// BUGFIX: previous logic reset the chunk array ONLY when
+        /// `chunks.Length != totalChunks`. With AMF HEVC at fixed GOP_SIZE,
+        /// every IDR has roughly the same size (200-450KB → 4-8 chunks of 60KB),
+        /// so chunks.Length matches across consecutive IDRs. WebRTC's dc.send()
+        /// is async, so IDR#2 chunks can arrive at the client BEFORE IDR#1 has
+        /// finished reassembling. The old code would silently overwrite IDR#1's
+        /// chunks with IDR#2's chunks at the same indices, producing a corrupt
+        /// mixed IDR that the decoder rejects — and the watchdog then fires
+        /// "No IDR in 2,5s" forever.
+        ///
+        /// Fix: always reset the array when chunkIndex=0 arrives. chunkIndex=0
+        /// unambiguously means "start of a new IDR" (the server sends chunks 0..N-1
+        /// in order within a single IDR).
         /// </summary>
         private void HandleH265IdrData(byte[] data)
         {
-            if (data.Length < 5) return; // type + trackIndex + chunkIndex + totalChunks + at least 1 byte data
+            if (data.Length < 6) return;
 
             int trackIndex = data[1];
             int chunkIndex = data[2];
             int totalChunks = data[3];
-            int dataLen = data.Length - 4;
+            int dataLen = (data[4] << 8) | data[5];
+
+            if (dataLen > data.Length - 6) dataLen = data.Length - 6;
 
             if (totalChunks == 1)
             {
-                // Single chunk — no reassembly needed
                 byte[] idrData = new byte[dataLen];
-                Buffer.BlockCopy(data, 4, idrData, 0, dataLen);
+                Buffer.BlockCopy(data, 6, idrData, 0, dataLen);
 
-                // Flush any stale P-frame chunk reassembly (new IDR = new GOP reference)
                 _pframeChunks.Remove(trackIndex);
+                _idrChunks.Remove(trackIndex);
                 _idrChunkStartTimes.Remove(trackIndex);
-                _consecutiveDroppedPframes = 0; // IDR received, reset corruption counter
-                UntaintTrack(trackIndex); // Clean IDR received — reference chain restored
+                _consecutiveDroppedPframes = 0;
+                UntaintTrack(trackIndex);
+                _reassemblingIdrTracks.Remove(trackIndex);
 
-                if (_h265Handlers.TryGetValue(trackIndex, out var handler))
-                {
-                    handler.FeedIdrFromDataChannel(idrData);
-                }
-                else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
-                {
-                    // Per-track mode: prepend codec config (VPS/SPS/PPS) if available
-                    byte[] feedData = idrData;
-                    if (_perTrackCodecConfig.TryGetValue(trackIndex, out var config) && config.Length > 0)
-                    {
-                        feedData = new byte[config.Length + idrData.Length];
-                        Buffer.BlockCopy(config, 0, feedData, 0, config.Length);
-                        Buffer.BlockCopy(idrData, 0, feedData, config.Length, idrData.Length);
-                    }
-                    receiver.OnEncodedFrameReceived(feedData, true,
-                        System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency);
-                }
-                else
-                {
-                    AppLog.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, IDR data lost");
-                }
+                FeedIdrToReceiver(trackIndex, idrData);
                 return;
             }
 
             // Multi-chunk reassembly
-            if (!_idrChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
+            byte[][] chunks;
+            if (chunkIndex == 0 ||
+                !_idrChunks.TryGetValue(trackIndex, out chunks) ||
+                chunks.Length != totalChunks)
             {
-                // Check if previous IDR assembly was incomplete (chunks were lost)
-                if (_idrChunks.ContainsKey(trackIndex) && chunkIndex == 0)
-                {
-                    var oldChunks = _idrChunks[trackIndex];
-                    int receivedCount = 0;
-                    for (int i = 0; i < oldChunks.Length; i++)
-                        if (oldChunks[i] != null) receivedCount++;
-                    AppLog.LogWarning($"[PhaseProtocol] IDR chunk loss detected for track {trackIndex}: had {receivedCount}/{oldChunks.Length} chunks, discarding stale assembly");
-                    TaintTrack(trackIndex, "IDR chunk loss");
-                }
+                // New reassembly window (always start fresh on chunkIndex=0 — see BUGFIX above)
                 chunks = new byte[totalChunks][];
                 _idrChunks[trackIndex] = chunks;
                 _idrChunkStartTimes[trackIndex] = DateTime.UtcNow;
-            }
-            else if (chunkIndex == 0 && chunks[0] != null)
-            {
-                // New IDR started while previous was incomplete
-                int receivedCount = 0;
-                for (int i = 0; i < chunks.Length; i++)
-                    if (chunks[i] != null) receivedCount++;
-                if (receivedCount < chunks.Length)
-                {
-                    AppLog.LogWarning($"[PhaseProtocol] New IDR started but previous incomplete for track {trackIndex}: {receivedCount}/{chunks.Length}");
-                }
-                chunks = new byte[totalChunks][];
-                _idrChunks[trackIndex] = chunks;
-                _idrChunkStartTimes[trackIndex] = DateTime.UtcNow;
+                if (!_reassemblingIdrTracks.Contains(trackIndex))
+                    _reassemblingIdrTracks.Add(trackIndex); // BLOCK P-frames until complete
             }
 
-            // Store this chunk
+            // Store chunk (allow out-of-order arrival)
             byte[] chunkData = new byte[dataLen];
-            Buffer.BlockCopy(data, 4, chunkData, 0, dataLen);
+            Buffer.BlockCopy(data, 6, chunkData, 0, dataLen);
             chunks[chunkIndex] = chunkData;
 
-            // Check if all chunks received
+            // Check if complete
             bool complete = true;
             int totalSize = 0;
             for (int i = 0; i < totalChunks; i++)
@@ -218,7 +229,6 @@ namespace VRWorkspace.Streaming
 
             if (complete)
             {
-                // Reassemble
                 byte[] idrData = new byte[totalSize];
                 int pos = 0;
                 for (int i = 0; i < totalChunks; i++)
@@ -226,86 +236,82 @@ namespace VRWorkspace.Streaming
                     Buffer.BlockCopy(chunks[i], 0, idrData, pos, chunks[i].Length);
                     pos += chunks[i].Length;
                 }
+
                 _idrChunks.Remove(trackIndex);
                 _idrChunkStartTimes.Remove(trackIndex);
-                _consecutiveDroppedPframes = 0; // IDR received, reset corruption counter
-                _pframeChunks.Remove(trackIndex); // Flush stale P-frame chunks on new IDR
-                UntaintTrack(trackIndex); // Complete IDR received — reference chain restored
+                _reassemblingIdrTracks.Remove(trackIndex); // UNBLOCK P-frames
 
-                if (_h265Handlers.TryGetValue(trackIndex, out var handler))
-                {
-                    handler.FeedIdrFromDataChannel(idrData);
-                }
-                else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
-                {
-                    // Per-track mode: prepend codec config (VPS/SPS/PPS) if available
-                    byte[] feedData = idrData;
-                    if (_perTrackCodecConfig.TryGetValue(trackIndex, out var config) && config.Length > 0)
-                    {
-                        feedData = new byte[config.Length + idrData.Length];
-                        Buffer.BlockCopy(config, 0, feedData, 0, config.Length);
-                        Buffer.BlockCopy(idrData, 0, feedData, config.Length, idrData.Length);
-                    }
-                    receiver.OnEncodedFrameReceived(feedData, true,
-                        System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency);
-                }
-                else
-                {
-                    AppLog.LogWarning($"[PhaseProtocol] No H265 handler/receiver for track {trackIndex}, reassembled IDR lost");
-                }
+                _consecutiveDroppedPframes = 0;
+                _pframeChunks.Remove(trackIndex);
+                UntaintTrack(trackIndex);
+
+                FeedIdrToReceiver(trackIndex, idrData);
             }
         }
 
-        // ── P-frame chunk reassembly state ──
-        private readonly System.Collections.Generic.Dictionary<int, byte[][]> _pframeChunks
-            = new System.Collections.Generic.Dictionary<int, byte[][]>();
-        private int _pframeCount = 0;
+        private void FeedIdrToReceiver(int trackIndex, byte[] idrData)
+        {
+            if (_h265Handlers.TryGetValue(trackIndex, out var handler))
+            {
+                handler.FeedIdrFromDataChannel(idrData);
+            }
+            else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
+            {
+                byte[] feedData = idrData;
+                if (_perTrackCodecConfig.TryGetValue(trackIndex, out var config) && config.Length > 0)
+                {
+                    feedData = new byte[config.Length + idrData.Length];
+                    Buffer.BlockCopy(config, 0, feedData, 0, config.Length);
+                    Buffer.BlockCopy(idrData, 0, feedData, config.Length, idrData.Length);
+                }
+                receiver.OnEncodedFrameReceived(feedData, true, GetTimestampUs());
+            }
+        }
 
-        /// <summary>
-        /// Handle H265 P-frame data received via DataChannel side-channel.
-        /// Format: [type=0x04][trackIndex(1)][chunkIndex(1)][totalChunks(1)][P-frame Annex-B data...]
-        /// Since the Encoded Transform API delivers broken FU fragments for H265,
-        /// ALL H265 frames (IDR + P) are now sent via DataChannel.
-        /// </summary>
         private void HandleH265PFrameData(byte[] data)
         {
-            if (data.Length < 5) return;
+            if (data.Length < 6) return;
 
             int trackIndex = data[1];
             int chunkIndex = data[2];
             int totalChunks = data[3];
-            int dataLen = data.Length - 4;
+            int dataLen = (data[4] << 8) | data[5];
+
+            if (dataLen > data.Length - 6) dataLen = data.Length - 6;
 
             if (totalChunks == 1)
             {
-                // Single chunk — no reassembly needed (most P-frames fit in one chunk)
                 byte[] pframeData = new byte[dataLen];
-                Buffer.BlockCopy(data, 4, pframeData, 0, dataLen);
+                Buffer.BlockCopy(data, 6, pframeData, 0, dataLen);
                 FeedPFrameToReceiver(trackIndex, pframeData);
                 return;
             }
 
-            // Multi-chunk reassembly (rare for P-frames, but possible at high bitrate)
-            if (!_pframeChunks.TryGetValue(trackIndex, out var chunks) || chunks.Length != totalChunks)
+            // BUGFIX (same pattern as IDR): always reset on chunkIndex=0 (start of new P-frame).
+            // With many P-frames per second (60fps encoded), adjacent P-frames are often
+            // identical in size → same totalChunks. The old code would silently overwrite
+            // P-frame N's chunks with P-frame N+1's chunks when chunkLengths matched,
+            // producing a corrupt mixed P-frame that the decoder rejects → visible
+            // artifacts and reference-chain drift.
+            byte[][] chunks;
+            if (chunkIndex == 0 ||
+                !_pframeChunks.TryGetValue(trackIndex, out chunks) ||
+                chunks.Length != totalChunks)
             {
-                // Check if previous P-frame assembly was incomplete (chunk loss = corruption)
-                if (_pframeChunks.ContainsKey(trackIndex) && chunkIndex == 0)
-                {
-                    _consecutiveDroppedPframes++;
-                    if (_consecutiveDroppedPframes <= 5 || _consecutiveDroppedPframes % 50 == 0)
-                        AppLog.LogWarning($"[PhaseProtocol] P-frame chunk loss for track {trackIndex} (consecutive: {_consecutiveDroppedPframes})");
-
-                    // ANY P-frame chunk loss breaks the reference chain — taint immediately
-                    TaintTrack(trackIndex, $"P-frame chunk loss (consecutive: {_consecutiveDroppedPframes})");
-                    _consecutiveDroppedPframes = 0;
-                }
+                chunks = new byte[totalChunks][];
+                _pframeChunks[trackIndex] = chunks;
+                _pframeChunkStartTimes[trackIndex] = DateTime.UtcNow;
+            }
+            else if ((DateTime.UtcNow - _pframeChunkStartTimes[trackIndex]).TotalMilliseconds > 200)
+            {
+                // Stale window (chunks held too long without completion) — start fresh.
                 chunks = new byte[totalChunks][];
                 _pframeChunks[trackIndex] = chunks;
                 _pframeChunkStartTimes[trackIndex] = DateTime.UtcNow;
             }
 
             byte[] chunkData = new byte[dataLen];
-            Buffer.BlockCopy(data, 4, chunkData, 0, dataLen);
+            Buffer.BlockCopy(data, 6, chunkData, 0, dataLen);
             chunks[chunkIndex] = chunkData;
 
             bool complete = true;
@@ -334,9 +340,20 @@ namespace VRWorkspace.Streaming
 
         private void FeedPFrameToReceiver(int trackIndex, byte[] pframeData)
         {
-            // Gate: drop P-frames for tainted tracks (reference chain broken)
+            // Gate 1: drop P-frames for tainted tracks (reference chain broken)
             if (_taintedTracks.Contains(trackIndex))
                 return;
+
+            // Gate 2: CRITICAL - drop P-frames while an IDR reassembly is in progress
+            // Since SCTP for video is 'unordered', P-frames can arrive while we're
+            // still waiting for retransmission of an IDR chunk. Feeding them to
+            // the decoder now would cause massive artifacts.
+            if (_reassemblingIdrTracks.Contains(trackIndex))
+            {
+                if (_pframeCount % 100 == 0)
+                    AppLog.LogWarning($"[PhaseProtocol] Dropping P-frame for track {trackIndex} (IDR reassembly in progress)");
+                return;
+            }
 
             _pframeCount++;
 
@@ -347,10 +364,12 @@ namespace VRWorkspace.Streaming
             else if (_h265Receivers.TryGetValue(trackIndex, out var receiver))
             {
                 // Direct feed to receiver if handler not available
-                receiver.OnEncodedFrameReceived(pframeData, false,
-                    System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency);
+                receiver.OnEncodedFrameReceived(pframeData, false, GetTimestampUs());
             }
         }
+
+        private static long GetTimestampUs()
+            => System.Diagnostics.Stopwatch.GetTimestamp() * 1_000_000 / System.Diagnostics.Stopwatch.Frequency;
 
         /// <summary>
         /// Handle cursor position update from server (WebSocket fallback).

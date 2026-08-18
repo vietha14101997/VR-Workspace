@@ -133,9 +133,13 @@ namespace VRWorkspace.ViewModels
         public event Action<byte[]> OnDCAudioData;
 
         /// <summary>
-        /// VR Mode status change event from server.
+        /// Fired when media relay state changes (true=relay active, false=relay stopped).
+        /// When relay is active, audio arrives as raw PCM16 instead of Opus.
         /// </summary>
-        public event Action<bool> OnVrModeChanged;
+        public event Action<bool> OnMediaRelayStateChanged;
+
+        /// <summary>Whether media relay (WebSocket fallback) is currently active.</summary>
+        public bool MediaRelayActive => _client?.MediaRelayActive ?? false;
 
         /// <summary>
         /// Cached audio track for late subscribers (OnTrack fires before RemoteAudioPlayer exists).
@@ -802,12 +806,6 @@ namespace VRWorkspace.ViewModels
                 OnDCAudioData?.Invoke(data);
             };
 
-            _client.OnVrModeChanged += (enabled) =>
-            {
-                if (_clientGeneration != subscribedGeneration) return;
-                OnVrModeChanged?.Invoke(enabled);
-            };
-
             _client.OnStreamingStarted += () =>
             {
                 if (_clientGeneration != subscribedGeneration) return;
@@ -843,6 +841,13 @@ namespace VRWorkspace.ViewModels
                 if (_clientGeneration != subscribedGeneration) return;
                 Debug.LogError($"[ConnectionViewModel] Reconnect failed after all attempts");
                 ForceDisconnect("Auto-reconnect failed after multiple attempts");
+            };
+
+            _client.OnMediaRelayStateChanged += (active) =>
+            {
+                if (_clientGeneration != subscribedGeneration) return;
+                AppLog.Log($"[ConnectionViewModel] Media relay state changed: {active}");
+                OnMediaRelayStateChanged?.Invoke(active);
             };
 
             _client.OnCursorPosition += (monitorIndex, u, v, visible, cursorType, cursorId) =>

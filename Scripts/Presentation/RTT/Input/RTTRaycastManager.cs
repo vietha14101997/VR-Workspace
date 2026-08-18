@@ -45,6 +45,18 @@ namespace VRWorkspace.UI.RTT.Input
                 return _instance;
             }
         }
+
+        /// <summary>
+        /// Reset static singleton state at the start of each Play session.
+        /// Without this, _applicationQuitting stays true after the previous session's
+        /// OnApplicationQuit, causing Instance to return null on the next Play.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            _instance = null;
+            _applicationQuitting = false;
+        }
         #endregion
 
         #region Configuration
@@ -82,6 +94,7 @@ namespace VRWorkspace.UI.RTT.Input
         // Reusable event data (avoid GC)
         private PointerEventData _pointerEventData;
         private List<RaycastResult> _raycastResults = new List<RaycastResult>();
+        private readonly List<GraphicRaycaster> _nestedRaycasters = new List<GraphicRaycaster>();
         #endregion
 
         #region Properties
@@ -291,10 +304,11 @@ namespace VRWorkspace.UI.RTT.Input
         /// </summary>
         private void RaycastNestedCanvases(Transform root, Vector2 screenPos)
         {
-            // Find all GraphicRaycasters in children (excluding the root one we already used)
-            var nestedRaycasters = root.GetComponentsInChildren<GraphicRaycaster>(false);
+            // Reuse the list because this path runs every gaze frame.
+            _nestedRaycasters.Clear();
+            root.GetComponentsInChildren(false, _nestedRaycasters);
 
-            foreach (var raycaster in nestedRaycasters)
+            foreach (var raycaster in _nestedRaycasters)
             {
                 // Skip the root raycaster (already processed)
                 if (raycaster.transform == root) continue;
@@ -435,6 +449,103 @@ namespace VRWorkspace.UI.RTT.Input
                 }
             }
         }
+
+        #region VCS Extension (Virtual Cursor Space)
+        /// <summary>
+        /// Set the cursor's hovered UI element from a UV coordinate on a given panel.
+        /// Mirrors the post-Raycast() state-update path so the existing click dispatch logic works.
+        /// </summary>
+        public bool SetHoverFromUV(RTTCanvasBase panel, Vector2 uv)
+        {
+            if (!TryBuildHitFromUV(panel, uv, out var panelData, out var hit, out var uvCoord))
+                return false;
+
+            var previousHover = _currentHoveredObject;
+            _currentHit = new RTTHitResult
+            {
+                isValid = hit != null,
+                hitUIElement = hit,
+                panel = panel,
+                uvCoordinate = uvCoord
+            };
+            _currentHoveredObject = hit;
+            if (previousHover != hit)
+            {
+                if (previousHover != null) SendPointerExit(previousHover);
+                if (hit != null) SendPointerEnter(hit);
+            }
+            panel.MarkDirty();
+            return hit != null;
+        }
+
+        /// <summary>
+        /// Send a click event to the UI element at the given UV on a specific panel.
+        /// Used by VCS drivers (mouse/gamepad) to dispatch clicks without going through gaze raycast.
+        /// </summary>
+        public bool SendClickAtUV(RTTCanvasBase panel, Vector2 uv)
+        {
+            if (!SetHoverFromUV(panel, uv))
+            {
+                Debug.Log($"[SendClickAtUV] SetHoverFromUV returned false for '{panel.name}' UV=({uv.x:F3},{uv.y:F3}) — no GraphicRaycaster hit");
+                return false;
+            }
+            // Diagnostic: dump element rect + raycast index for full debug.
+            var rt0 = _raycastResults[0];
+            Debug.Log($"[SendClickAtUV] panel='{panel.name}' UV=({uv.x:F3},{uv.y:F3}) hitElement='{_currentHit.hitUIElement?.name ?? "null"}' depth={rt0.depth} sortingOrder={rt0.sortingOrder} canvasScreenPos={rt0.screenPosition} worldPos={rt0.worldPosition}");
+            bool sent = SendClick();
+            return sent;
+        }
+
+        /// <summary>Inverse of CalculateUVFromHitPoint: rebuild cached raycast state from (panel, UV).</summary>
+        private bool TryBuildHitFromUV(
+            RTTCanvasBase panel,
+            Vector2 uv,
+            out RTTPanelRaycastData panelData,
+            out GameObject hitUIElement,
+            out Vector2 uvCoordinate)
+        {
+            hitUIElement = null;
+            uvCoordinate = Vector2.zero;
+            panelData = null;
+
+            if (panel == null) return false;
+            panelData = GetOrCreatePanelData(panel);
+            if (panelData == null || panelData.graphicRaycaster == null || panelData.renderTexture == null)
+                return false;
+
+            Vector2 screenPos = UVToScreenPosition(uv, panelData);
+            _pointerEventData.position = screenPos;
+            // NOTE: PointerEventData.pressEventCamera and enterEventCamera are read-only
+            // in Unity's EventSystems; we cannot assign them. GraphicRaycaster falls back
+            // through: pressEventCamera → enterEventCamera → canvas.worldCamera.
+            // RTTCanvasBase.SetupCanvas sets canvas.worldCamera = _uiCamera, so the
+            // fallback resolves correctly without us needing to set anything.
+            var cv = panelData.graphicRaycaster.GetComponent<Canvas>();
+            var canvasRect = cv != null ? cv.GetComponent<RectTransform>().rect.ToString() : "null";
+            Debug.Log($"[TryBuildHitFromUV] panel='{panel.name}' uv=({uv.x:F3},{uv.y:F3}) rt=({panelData.renderTexture.width}x{panelData.renderTexture.height}) screenPos=({screenPos.x:F0},{screenPos.y:F0}) canvasRect={canvasRect}");
+
+            _raycastResults.Clear();
+            panelData.graphicRaycaster.Raycast(_pointerEventData, _raycastResults);
+            // Also raycast against nested canvases (dropdowns, etc.) — same as gaze Raycast does.
+            RaycastNestedCanvases(panelData.graphicRaycaster.transform, screenPos);
+
+            if (_raycastResults.Count == 0) return false;
+            // Sort by sortingOrder desc, then depth desc — match gaze Raycast ordering.
+            if (_raycastResults.Count > 1)
+            {
+                _raycastResults.Sort((a, b) =>
+                {
+                    int cmp = b.sortingOrder.CompareTo(a.sortingOrder);
+                    return cmp != 0 ? cmp : b.depth.CompareTo(a.depth);
+                });
+            }
+
+            var first = _raycastResults[0];
+            hitUIElement = first.gameObject;
+            uvCoordinate = uv;
+            return hitUIElement != null;
+        }
+        #endregion
 
         /// <summary>
         /// Get the current hit result
@@ -692,6 +803,7 @@ namespace VRWorkspace.UI.RTT.Input
         public GameObject hitUIElement;
 
         /// <summary>The full raycast result from GraphicRaycaster</summary>
+        [System.NonSerialized]
         public RaycastResult raycastResult;
 
         /// <summary>Distance from ray origin to hit point</summary>

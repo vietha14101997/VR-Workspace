@@ -22,12 +22,8 @@ namespace VRWorkspace.Streaming
             _audioSource.playOnAwake = false;
             _audioSource.spatialBlend = 0f; // 2D audio (non-spatial, full volume both ears)
 
-            // Reduce Unity audio DSP buffer for lower latency.
-            // Default is 1024 samples (~21ms). 256 samples = ~5ms per buffer.
-            var audioConfig = AudioSettings.GetConfiguration();
-            audioConfig.dspBufferSize = 256;
-            AudioSettings.Reset(audioConfig);
-            AppLog.Log($"[RemoteAudioPlayer] DSP buffer set to 256 for low latency");
+            // DSP buffer reset moved to DataChannelAudioPlayer (Primary player)
+            // to avoid multiple resets killing active audio sources.
         }
 
         /// <summary>

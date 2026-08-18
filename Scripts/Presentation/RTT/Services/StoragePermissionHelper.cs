@@ -110,6 +110,17 @@ namespace VRWorkspace.UI.RTT.Services
             RequestFullFileAccess(onComplete);
         }
 
+        #if UNITY_ANDROID && !UNITY_EDITOR
+        // Session-level dedupe for opening the All Files Settings page.
+        // Multiple startup paths (AppPermissionManager, file manager init, etc.) can
+        // race to call OpenManageAllFilesSettings within milliseconds of each other,
+        // stacking two Settings activities on the activity back-stack so the user has
+        // to press Back twice to return to the app. Cooldown windows multiple callers
+        // down to a single Settings open per session window.
+        private static float _lastAllFilesOpenTime = -100f;
+        private const float ALL_FILES_OPEN_COOLDOWN = 30f;
+#endif
+
         /// <summary>
         /// Request FULL file access (all file types).
         /// On Android 11+, opens Settings for MANAGE_EXTERNAL_STORAGE.
@@ -126,7 +137,17 @@ namespace VRWorkspace.UI.RTT.Services
             {
                 if (!HasManageExternalStoragePermission())
                 {
+                    // Dedupe: skip if another caller already opened Settings recently.
+                    // The other caller (AppPermissionManager) will handle the user response.
+                    if (Time.unscaledTime - _lastAllFilesOpenTime < ALL_FILES_OPEN_COOLDOWN)
+                    {
+                        Debug.Log("[StoragePermission] Skipping duplicate All Files Settings open (within cooldown)");
+                        onComplete?.Invoke(false);
+                        return;
+                    }
+
                     Debug.Log("[StoragePermission] Opening Settings for MANAGE_EXTERNAL_STORAGE");
+                    _lastAllFilesOpenTime = Time.unscaledTime;
                     OpenManageAllFilesSettings();
                     onComplete?.Invoke(false); // User needs to manually enable
                     return;
@@ -252,10 +273,22 @@ namespace VRWorkspace.UI.RTT.Services
 
         /// <summary>
         /// Open system Settings to grant MANAGE_EXTERNAL_STORAGE permission (Android 11+).
+        /// Cooldown-deduped: callers within the cooldown window are skipped silently.
         /// </summary>
         public static void OpenManageAllFilesSettings()
         {
     #if UNITY_ANDROID && !UNITY_EDITOR
+            // Single-source dedupe: every path (AppPermissionManager startup,
+            // file manager init, user-clicked "grant access") funnels through
+            // here. The 30-second cooldown collapses races that would otherwise
+            // stack two Settings activities on the Android back-stack.
+            if (Time.unscaledTime - _lastAllFilesOpenTime < ALL_FILES_OPEN_COOLDOWN)
+            {
+                Debug.Log("[StoragePermission] Skipping duplicate All Files Settings open (within cooldown)");
+                return;
+            }
+            _lastAllFilesOpenTime = Time.unscaledTime;
+
             try
             {
                 using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))

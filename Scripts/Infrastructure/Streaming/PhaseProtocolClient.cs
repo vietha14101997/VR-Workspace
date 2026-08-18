@@ -127,6 +127,11 @@ namespace VRWorkspace.Streaming
         // Guards against stale SDP answers from superseded reconnects
         private volatile int _reconnectGeneration = 0;
 
+        // ── Media Relay (DERP-style fallback over WebSocket) ──────────────────
+        private volatile bool _mediaRelayActive;
+        /// <summary>Whether media relay (WebSocket fallback) is currently active.</summary>
+        public bool MediaRelayActive => _mediaRelayActive;
+
         // ── Receive loop internals ─────────────────────────────────────────────
         private int   _msgCounter            = 0;
         private const int RECEIVE_TIMEOUT_MS = 30000;
@@ -160,7 +165,8 @@ namespace VRWorkspace.Streaming
         public event Action<string[]>?                          OnReconnectFailed;
         public event Action?                                    OnSessionReconnectRequested;
         public event Action<string, double, int>?               OnSpeedTestProgress;
-        public event Action<bool>?                              OnVrModeChanged;
+        /// <summary>Fired when media relay state changes (true=relay active, false=relay stopped).</summary>
+        public event Action<bool>?                              OnMediaRelayStateChanged;
         // NOTE: OnSkipToLiveAck, OnBitrateAdjusted, OnQualityRecommendation are declared
         // in PhaseProtocolClient.Metrics.cs (that partial also owns SkipToLiveImmediate).
 
@@ -307,11 +313,13 @@ namespace VRWorkspace.Streaming
                     allReady = !_allFirstFramesFired && _monitorsWithFirstFrame.Count >= _expectedMonitorCount;
                     if (allReady) _allFirstFramesFired = true;
                 }
-                AppLog.Log($"[PhaseProtocol] Monitor {monitorIndex} first frame decoded ({_monitorsWithFirstFrame.Count}/{_expectedMonitorCount})");
+                // IMPORTANT: Use Debug.Log (not AppLog) so this appears in device logcat
+                // AppLog is stripped from builds via [Conditional("UNITY_EDITOR")]
+                Debug.Log($"[PhaseProtocol] Monitor {monitorIndex} first frame decoded ({_monitorsWithFirstFrame.Count}/{_expectedMonitorCount})");
                 OnMonitorFirstFrame?.Invoke(monitorIndex);
                 if (allReady)
                 {
-                    AppLog.Log("[PhaseProtocol] ALL monitors have first frame — ready to display");
+                    Debug.Log("[PhaseProtocol] ALL monitors have first frame — ready to display");
                     OnAllMonitorsFirstFrame?.Invoke();
                 }
             };
@@ -478,6 +486,10 @@ namespace VRWorkspace.Streaming
             if (!_streamingStartedFired)
             {
                 _streamingStartedFired = true;
+                // Reset weak-network timer at stream start so a stale value carried over from a
+                // previous session (or from before Phase 3) cannot trigger an immediate
+                // disconnect when the host GPU encoder is still warming up.
+                ResetWeakNetworkTimer();
                 // Start frame stall monitor
                 _ = FrameStallMonitorAsync(_cts!.Token);
                 OnStreamingStarted?.Invoke();
@@ -655,15 +667,40 @@ namespace VRWorkspace.Streaming
 
                     _msgCounter++;
 
-                    // Binary message (speed test data)
+                    // Any inbound WebSocket message proves the server is alive. Used by the
+                    // weak-network detector so an idle desktop — which produces no encoded
+                    // frames but still sends the 5 s keep-alive ping and frameTiming messages —
+                    // does not look like a dead connection. Tracked separately from the
+                    // frame-decoded timer (which still drives freeze/keyframe logic).
+                    NoteServerContact();
+
+                    // Binary message (media relay or speed test data)
                     if (first.MessageType == WebSocketMessageType.Binary)
                     {
+                        // Accumulate full message into buffer
                         int total = first.Count;
                         while (!first.EndOfMessage)
                         {
-                            first  = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+                            // Grow buffer if needed
+                            if (total + 4096 > buffer.Length)
+                                Array.Resize(ref buffer, buffer.Length * 2);
+                            first = await _ws.ReceiveAsync(
+                                new ArraySegment<byte>(buffer, total, buffer.Length - total), ct);
                             total += first.Count;
                         }
+
+                        // Media relay envelope: first byte is channel prefix (0xF1-0xF5)
+                        if (_mediaRelayActive && total > 1)
+                        {
+                            byte channel = buffer[0];
+                            if (channel >= 0xF1 && channel <= 0xF5)
+                            {
+                                HandleRelayMediaMessage(buffer, total);
+                                continue;
+                            }
+                        }
+
+                        // Speed test data
                         _speedTest?.RecordBytesReceived(total);
                         _phase1?.RecordBinaryBytes(total);
                         continue;
@@ -814,10 +851,6 @@ namespace VRWorkspace.Streaming
                             HandleMonitorIdle(json);
                             break;
 
-                        case "vr_mode_changed":
-                            OnVrModeChanged?.Invoke(json.GetBool("enabled"));
-                            break;
-
                         // ── Cursor (partial file) ─────────────────────────────
                         case "cursor_position":
                             HandleCursorPosition(json);
@@ -857,6 +890,19 @@ namespace VRWorkspace.Streaming
                             }
                             break;
 
+                        // ── Media Relay ───────────────────────────────────────
+                        case "media_relay_start":
+                            _mediaRelayActive = true;
+                            AppLog.Log("[PhaseProtocol] Media relay STARTED (WebSocket fallback active)");
+                            OnMediaRelayStateChanged?.Invoke(true);
+                            break;
+
+                        case "media_relay_stop":
+                            _mediaRelayActive = false;
+                            AppLog.Log("[PhaseProtocol] Media relay STOPPED (back to WebRTC)");
+                            OnMediaRelayStateChanged?.Invoke(false);
+                            break;
+
                         case null:
                         case "":
                             AppLog.LogWarning($"[PhaseProtocol] Empty/null type! Raw: {text.Substring(0, Math.Min(300, text.Length))}");
@@ -874,6 +920,11 @@ namespace VRWorkspace.Streaming
             }
             else if (text.Equals("ping", StringComparison.OrdinalIgnoreCase))
             {
+                // Server-initiated keep-alive ping (5 s interval, see
+                // RemotePlayServer/.../PhaseProtocolHandler.Phase3.cs StartKeepAlive). Refresh
+                // the weak-network timer so an idle desktop that produces no encoded frames
+                // still keeps the connection alive.
+                NoteServerContact();
                 _ = SendTextAsync("pong");
             }
             else if (text.Equals("pong", StringComparison.OrdinalIgnoreCase) ||
@@ -1104,6 +1155,74 @@ namespace VRWorkspace.Streaming
             catch (Exception ex)
             {
                 AppLog.LogWarning($"[PhaseProtocol] Send error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Send a binary WebSocket message (used by media relay for input forwarding).
+        /// </summary>
+        internal async Task SendBytesAsync(byte[] data, int offset, int count)
+        {
+            if (_ws?.State != WebSocketState.Open) return;
+
+            try
+            {
+                await _ws!.SendAsync(
+                    new ArraySegment<byte>(data, offset, count),
+                    WebSocketMessageType.Binary,
+                    endOfMessage: true,
+                    _cts!.Token);
+            }
+            catch (Exception ex)
+            {
+                AppLog.LogWarning($"[PhaseProtocol] SendBytes error: {ex.Message}");
+            }
+        }
+
+        // ── Media Relay demultiplexer ──────────────────────────────────────────
+
+        /// <summary>
+        /// Demultiplex incoming binary media relay messages.
+        /// Protocol: 1-byte channel prefix + payload.
+        ///   0xF1 = Video (H264/H265 frame data)
+        ///   0xF2 = Audio (raw PCM16)
+        ///   0xF3 = Cursor (binary cursor position/image)
+        /// </summary>
+        private void HandleRelayMediaMessage(byte[] buffer, int totalLength)
+        {
+            byte channel = buffer[0];
+            int payloadLength = totalLength - 1;
+
+            switch (channel)
+            {
+                case 0xF1: // Video
+                {
+                    var payload = new byte[payloadLength];
+                    Buffer.BlockCopy(buffer, 1, payload, 0, payloadLength);
+                    HandleH265VideoFromDataChannel(payload);
+                    break;
+                }
+
+                case 0xF2: // Audio (raw PCM16)
+                {
+                    var payload = new byte[payloadLength];
+                    Buffer.BlockCopy(buffer, 1, payload, 0, payloadLength);
+                    OnAudioDataReceived?.Invoke(payload);
+                    break;
+                }
+
+                case 0xF3: // Cursor
+                {
+                    var payload = new byte[payloadLength];
+                    Buffer.BlockCopy(buffer, 1, payload, 0, payloadLength);
+                    HandleCursorFromDataChannel(payload);
+                    break;
+                }
+
+                default:
+                    if (VerboseLogging)
+                        AppLog.LogWarning($"[PhaseProtocol] Unknown relay channel: 0x{channel:X2}");
+                    break;
             }
         }
 

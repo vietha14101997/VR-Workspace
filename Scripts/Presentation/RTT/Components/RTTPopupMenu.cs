@@ -72,7 +72,7 @@ namespace VRWorkspace.UI.RTT.Components
         {
             public string text;
             public Sprite icon;           // null = text only
-            public Color? color;          // null = use primaryColor
+            [NonSerialized] public Color? color;          // null = use primaryColor
             public bool isSelected;
             public UnityAction onClick;
 

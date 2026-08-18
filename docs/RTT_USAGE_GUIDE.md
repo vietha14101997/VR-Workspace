@@ -129,7 +129,10 @@ Filter Mode: Bilinear
 
 // Performance:
 Use Dirty Flag: true
-Max Frame Skip: 2
+Max Frame Skip: 7 // Khoảng 10 lần render/giây ở 72 Hz; 0 = chỉ render khi dirty
+
+// Giá trị 1-6 được runtime clamp lên 7 để tránh RTT render quá dày trên mobile.
+// Nội dung cần cập nhật liên tục phải dùng SetContinuousRender(true) hoặc MarkDirty().
 
 // Debug:
 Show Debug Gizmos: true (dev) / false (prod)

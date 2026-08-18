@@ -65,7 +65,7 @@ namespace VRWorkspace.Media.UI
             _accentColor = accentColor;
 
             BuildUI();
-            Hide();
+            SetHiddenImmediate();
         }
 
         private void BuildUI()
@@ -282,6 +282,16 @@ namespace VRWorkspace.Media.UI
                 StopCoroutine(_fadeCoroutine);
 
             gameObject.SetActive(true);
+            _canvasGroup.interactable = true;
+            _canvasGroup.blocksRaycasts = true;
+
+            if (!isActiveAndEnabled)
+            {
+                _canvasGroup.alpha = 1f;
+                _fadeCoroutine = null;
+                return;
+            }
+
             _fadeCoroutine = StartCoroutine(FadeIn());
         }
 
@@ -394,7 +404,28 @@ namespace VRWorkspace.Media.UI
             if (_fadeCoroutine != null)
                 StopCoroutine(_fadeCoroutine);
 
+            _fadeCoroutine = null;
+            _canvasGroup.interactable = false;
+            _canvasGroup.blocksRaycasts = false;
+
+            if (!isActiveAndEnabled)
+            {
+                SetHiddenImmediate();
+                return;
+            }
+
             _fadeCoroutine = StartCoroutine(FadeOut());
+        }
+
+        /// <summary>
+        /// Hide without animation before the player hierarchy is deactivated.
+        /// </summary>
+        public void HideImmediate()
+        {
+            if (_fadeCoroutine != null && isActiveAndEnabled)
+                StopCoroutine(_fadeCoroutine);
+
+            SetHiddenImmediate();
         }
         #endregion
 
@@ -412,6 +443,7 @@ namespace VRWorkspace.Media.UI
             }
 
             _canvasGroup.alpha = 1f;
+            _fadeCoroutine = null;
         }
 
         private IEnumerator FadeOut()
@@ -427,6 +459,22 @@ namespace VRWorkspace.Media.UI
             }
 
             _canvasGroup.alpha = 0f;
+            _canvasGroup.interactable = false;
+            _canvasGroup.blocksRaycasts = false;
+            _fadeCoroutine = null;
+            gameObject.SetActive(false);
+        }
+
+        private void SetHiddenImmediate()
+        {
+            if (_canvasGroup != null)
+            {
+                _canvasGroup.alpha = 0f;
+                _canvasGroup.interactable = false;
+                _canvasGroup.blocksRaycasts = false;
+            }
+
+            _fadeCoroutine = null;
             gameObject.SetActive(false);
         }
         #endregion

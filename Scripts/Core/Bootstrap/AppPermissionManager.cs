@@ -18,6 +18,17 @@ namespace VRWorkspace.Core
         public static AppPermissionManager Instance { get; private set; }
 
         /// <summary>
+        /// Reset static singleton at the start of each Play session.
+        /// Without this, Instance keeps a ghost reference to a destroyed object
+        /// on the 2nd Play onwards (Unity doesn't reset static fields on Play exit).
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticInstance()
+        {
+            Instance = null;
+        }
+
+        /// <summary>
         /// Event fired when all permissions have been processed (granted or denied).
         /// </summary>
         public event Action<bool> OnPermissionsComplete;
@@ -38,6 +49,11 @@ namespace VRWorkspace.Core
         // PlayerPrefs key to track if we've already requested permissions
         private const string PREF_PERMISSIONS_REQUESTED = "VRWorkspace_PermissionsRequested";
         private const string PREF_FULL_ACCESS_DECLINED = "VRWorkspace_FullAccessDeclined";
+
+        // Session-level flag: user just returned from All Files Settings without granting.
+        // Prevents the media permission dialog from popping up immediately after back-press.
+        // Media permission will be requested on the next app launch instead.
+        private bool _justDeclinedAllFilesThisSession;
 
         private void Awake()
         {
@@ -142,6 +158,10 @@ namespace VRWorkspace.Core
                                 Debug.Log("[PermissionManager] User returned without granting full access");
                                 PlayerPrefs.SetInt(PREF_FULL_ACCESS_DECLINED, 1);
                                 PlayerPrefs.Save();
+                                // Mark session flag so we don't immediately show the
+                                // media permission dialog on top of the back-press.
+                                // The media flow will run on the next app launch instead.
+                                _justDeclinedAllFilesThisSession = true;
                                 break;
                             }
 
@@ -149,8 +169,19 @@ namespace VRWorkspace.Core
                             elapsed += 0.5f;
                         }
                     }
+                    else
+                    {
+                        // User previously declined All Files — also gate this session.
+                        _justDeclinedAllFilesThisSession = true;
+                    }
 
-                    if (!HasManageExternalStoragePermission() && sdkVersion >= 33)
+                    // Skip the media permission request if user just returned from
+                    // (or previously declined) All Files Settings this session.
+                    // Otherwise back-pressing from Settings triggers an immediate
+                    // second dialog, which is bad UX.
+                    if (!_justDeclinedAllFilesThisSession
+                        && !HasManageExternalStoragePermission()
+                        && sdkVersion >= 33)
                     {
                         yield return StartCoroutine(RequestMediaPermissions((granted) => {
                             // Media access fallback
@@ -425,26 +456,10 @@ namespace VRWorkspace.Core
 
         private void OpenManageAllFilesSettings()
         {
-            try
-            {
-                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
-                using (var intent = new AndroidJavaObject("android.content.Intent",
-                    "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"))
-                {
-                    using (var uri = new AndroidJavaClass("android.net.Uri"))
-                    using (var uriObj = uri.CallStatic<AndroidJavaObject>("parse", "package:" + Application.identifier))
-                    {
-                        intent.Call<AndroidJavaObject>("setData", uriObj);
-                        activity.Call("startActivity", intent);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[PermissionManager] Failed to open Settings: {ex.Message}");
-                OpenAppSettings();
-            }
+            // Route through the shared helper so both call sites (startup flow here
+            // and file-manager flow in StoragePermissionHelper) share the same
+            // session-level cooldown — only one Settings activity is opened per session.
+            VRWorkspace.UI.RTT.Services.StoragePermissionHelper.OpenManageAllFilesSettings();
         }
 
         private void OpenAppSettings()
